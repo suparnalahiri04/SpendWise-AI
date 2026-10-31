@@ -147,7 +147,7 @@ export function OverviewPage() {
           icon={Receipt}
           value={spendingValue}
           hint={spendingHint}
-          accent="forest"
+          variant="hero"
         />
         <StatCard
           label="Income"
@@ -225,7 +225,7 @@ export function OverviewPage() {
                 <li key={step}>
                   <Link
                     to={to}
-                    className="group flex h-full flex-col gap-3 rounded-xl border border-border bg-paper/60 p-4 outline-none transition-colors hover:border-sage-deep hover:bg-sage/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="group flex h-full flex-col gap-3 rounded-xl border border-border bg-paper/60 p-4 outline-none transition-all duration-150 hover:border-sage-deep hover:bg-sage/40 hover:shadow-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
                   >
                     <span className="flex items-center justify-between">
                       <span className="flex size-8 items-center justify-center rounded-lg bg-card text-forest shadow-card">

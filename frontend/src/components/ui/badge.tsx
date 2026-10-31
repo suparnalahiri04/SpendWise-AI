@@ -12,6 +12,7 @@ const badgeVariants = cva(
         butter: 'bg-butter/70 text-ink',
         terracotta: 'bg-terracotta/15 text-[#9a4a33]',
         outline: 'border border-border text-muted-foreground',
+        lime: 'bg-lime/15 text-lime-deep border border-lime/30',
       },
     },
     defaultVariants: { tone: 'neutral' },
