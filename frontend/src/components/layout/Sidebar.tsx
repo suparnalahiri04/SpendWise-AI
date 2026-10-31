@@ -1,6 +1,7 @@
 import { UserRound } from 'lucide-react'
 import { LayoutGroup } from 'motion/react'
 import { PRIMARY_NAV, SETTINGS_NAV } from '@/config/navigation'
+import { useAuth } from '@/features/auth/auth'
 import { cn } from '@/lib/utils'
 import { BrandMark } from './BrandMark'
 import { SidebarNavLink } from './SidebarNavLink'
@@ -15,6 +16,7 @@ interface SidebarContentProps {
 
 /** Sidebar body shared by the desktop sidebar and the mobile drawer. */
 export function SidebarContent({ layoutId, onNavigate, className }: SidebarContentProps) {
+  const { user } = useAuth()
   return (
     <LayoutGroup id={layoutId}>
       <div className={cn('flex h-full flex-col gap-8 px-4 py-6', className)}>
@@ -45,8 +47,8 @@ export function SidebarContent({ layoutId, onNavigate, className }: SidebarConte
               <UserRound className="size-4" />
             </span>
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-semibold text-ink">Guest</p>
-              <p className="truncate text-xs text-muted-foreground">Not signed in</p>
+              <p className="truncate text-sm font-semibold text-ink">Signed in</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email ?? 'Your account'}</p>
             </div>
           </div>
         </div>

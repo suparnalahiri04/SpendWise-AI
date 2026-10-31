@@ -1,0 +1,112 @@
+
+description,category
+Starbucks coffee,Food/Dining
+Restaurant dinner,Food/Dining
+Pizza Hut order,Food/Dining
+Swiggy food delivery,Food/Dining
+Zomato lunch order,Food/Dining
+Cafe coffee and snacks,Food/Dining
+McDonalds burger,Food/Dining
+Dominos pizza,Food/Dining
+Restaurant bill payment,Food/Dining
+Bakery purchase,Food/Dining
+Amazon shopping,Shopping
+Bought new shoes,Shopping
+Clothing store purchase,Shopping
+Flipkart electronics order,Shopping
+Myntra clothing order,Shopping
+Headphones purchase,Shopping
+Furniture store payment,Shopping
+Online shopping order,Shopping
+Sports shoes purchase,Shopping
+Supermarket household items,Shopping
+Uber ride,Transport
+Ola cab fare,Transport
+Metro card recharge,Transport
+Petrol pump payment,Transport
+Diesel fuel purchase,Transport
+Bus ticket payment,Transport
+Train ticket booking,Transport
+Auto rickshaw fare,Transport
+Airport taxi fare,Transport
+Parking fee,Transport
+Grocery store,Groceries
+BigBasket grocery order,Groceries
+Vegetables and fruits,Groceries
+Milk and bread purchase,Groceries
+Rice and flour purchase,Groceries
+Supermarket groceries,Groceries
+Eggs and dairy purchase,Groceries
+Local vegetable market,Groceries
+Cooking oil purchase,Groceries
+Monthly grocery bill,Groceries
+Electricity bill payment,Bills/Utilities
+Water bill payment,Bills/Utilities
+Internet broadband bill,Bills/Utilities
+Mobile phone recharge,Bills/Utilities
+Gas cylinder booking,Bills/Utilities
+Monthly rent payment,Bills/Utilities
+DTH subscription payment,Bills/Utilities
+Home utility bill,Bills/Utilities
+Telephone bill payment,Bills/Utilities
+Internet service payment,Bills/Utilities
+College tuition fee,Education
+University semester fee,Education
+Online course subscription,Education
+Textbook purchase,Education
+School fee payment,Education
+Exam registration fee,Education
+Coding course payment,Education
+Study material purchase,Education
+Library fee payment,Education
+Educational workshop fee,Education
+Movie theatre tickets,Entertainment
+Netflix subscription,Entertainment
+Spotify subscription,Entertainment
+Concert ticket booking,Entertainment
+Video game purchase,Entertainment
+Amusement park tickets,Entertainment
+Cinema snacks,Entertainment
+Gaming subscription,Entertainment
+Music streaming subscription,Entertainment
+Bowling alley payment,Entertainment
+Doctor consultation,Healthcare
+Pharmacy medicine purchase,Healthcare
+Hospital bill payment,Healthcare
+Dental clinic payment,Healthcare
+Medical test charges,Healthcare
+Prescription medicine,Healthcare
+Eye checkup fee,Healthcare
+Health clinic consultation,Healthcare
+Laboratory test payment,Healthcare
+Medical store purchase,Healthcare
+Monthly salary,Income
+Salary credited,Income
+Freelance project payment,Income
+Client payment received,Income
+Interest credited,Income
+Dividend received,Income
+Bonus payment received,Income
+Consulting income,Income
+Refund received,Income
+Rental income received,Income
+Transfer to savings account,Transfers/Repayments
+Credit card bill repayment,Transfers/Repayments
+Loan EMI repayment,Transfers/Repayments
+Money transferred to friend,Transfers/Repayments
+UPI transfer to family,Transfers/Repayments
+Bank account transfer,Transfers/Repayments
+Personal loan repayment,Transfers/Repayments
+Credit card payment,Transfers/Repayments
+Transfer between own accounts,Transfers/Repayments
+Loan installment payment,Transfers/Repayments
+Miscellaneous payment,Other
+Unknown merchant transaction,Other
+General service charge,Other
+Unrecognized purchase,Other
+Administrative fee,Other
+Miscellaneous expense,Other
+Uncategorized transaction,Other
+Other merchant payment,Other
+General transaction charge,Other
+Unidentified bank transaction,Other

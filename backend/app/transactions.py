@@ -11,6 +11,7 @@ from app.schemas import (
     TransactionResponse,
     TransactionUpdate,
 )
+from ml.predict import predict_category
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -27,16 +28,54 @@ def create_transaction(
 ) -> Transaction:
     """Create a transaction for the authenticated user."""
 
+    description = transaction_data.description.strip()
+
+    if not description:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Transaction description cannot be empty.",
+        )
+
+    predicted_category = None
+    prediction_confidence = None
+    is_reviewed = transaction_data.category is not None
+
+    if transaction_data.category is not None:
+        # Preserve the category explicitly selected by the user.
+        category = transaction_data.category.strip()
+
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Category cannot be empty.",
+            )
+    else:
+        # Suggest a category when the user did not provide one.
+        try:
+            prediction = predict_category(description)
+            predicted_category = prediction["predicted_category"]
+            prediction_confidence = prediction["confidence"]
+
+            if prediction["needs_review"]:
+                # Keep the suggestion separate until the user reviews it.
+                category = "Other"
+            else:
+                category = predicted_category
+
+        except (FileNotFoundError, ValueError):
+            # Keep transaction creation available if the model is unavailable.
+            category = "Other"
+
     transaction = Transaction(
         user_id=current_user.id,
         transaction_date=transaction_data.transaction_date,
-        description=transaction_data.description.strip(),
+        description=description,
         amount=transaction_data.amount,
         transaction_type=transaction_data.transaction_type,
-        category=transaction_data.category.strip(),
-        predicted_category=None,
-        prediction_confidence=None,
-        is_reviewed=True,
+        category=category,
+        predicted_category=predicted_category,
+        prediction_confidence=prediction_confidence,
+        is_reviewed=is_reviewed,
     )
 
     db.add(transaction)

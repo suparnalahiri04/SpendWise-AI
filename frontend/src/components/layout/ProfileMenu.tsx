@@ -1,5 +1,5 @@
-import { ChevronDown, LogIn, Settings, UserRound } from 'lucide-react'
-import { Link } from 'react-router'
+import { ChevronDown, LogOut, Settings, UserRound } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,8 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/features/auth/auth'
 
 export function ProfileMenu() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const name = user?.email ?? 'Your account'
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -24,14 +29,14 @@ export function ProfileMenu() {
           >
             <UserRound className="size-4" />
           </span>
-          <span className="hidden text-sm font-medium text-ink sm:inline">Guest</span>
+          <span className="hidden max-w-32 truncate text-sm font-medium text-ink sm:inline">{name}</span>
           <ChevronDown className="hidden size-3.5 text-muted-foreground sm:inline" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-60">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold text-foreground">Guest</span>
-          <span className="font-normal">Not signed in</span>
+          <span className="text-sm font-semibold text-foreground">Signed in</span>
+          <span className="truncate font-normal">{name}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -40,13 +45,16 @@ export function ProfileMenu() {
             Settings
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <LogIn aria-hidden="true" />
-          Sign in
-          <span className="ml-auto text-xs text-muted-foreground">Coming later</span>
+        <DropdownMenuItem
+          onSelect={() => {
+            logout()
+            navigate('/login', { replace: true })
+          }}
+        >
+          <LogOut aria-hidden="true" />
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
-

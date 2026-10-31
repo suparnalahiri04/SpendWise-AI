@@ -1,17 +1,18 @@
 import {
-  ArrowRight,
   ArrowLeftRight,
+  ArrowRight,
+  CloudOff,
   FileText,
   Lightbulb,
   PiggyBank,
   Receipt,
+  RefreshCw,
   Target,
   TrendingUp,
   Wallet,
 } from 'lucide-react'
 import { Link } from 'react-router'
 import { TrendChart } from '@/components/charts/TrendChart'
-import { EmptyState } from '@/components/common/EmptyState'
 import { PageIntro } from '@/components/common/PageIntro'
 import { PeriodBadge } from '@/components/common/PeriodBadge'
 import { StatCard } from '@/components/common/StatCard'
@@ -19,6 +20,12 @@ import { AnimatedPage, Reveal } from '@/components/motion/AnimatedPage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { calculateOverviewSummary } from '@/features/overview/overviewCalculations'
+import { TopCategoriesBreakdown } from '@/features/overview/TopCategoriesBreakdown'
+import { usePeriod } from '@/features/period/period'
+import { filterTransactionsByPeriod } from '@/features/period/periodUtils'
+import { useTransactions } from '@/features/transactions/useTransactions'
+import { formatAmount } from '@/lib/format'
 
 const NO_DATA_HINT = 'Available after your first statement import'
 
@@ -47,20 +54,122 @@ const GETTING_STARTED = [
 ] as const
 
 export function OverviewPage() {
+  const txState = useTransactions()
+  const { period, periodLabel } = usePeriod()
+
+  const allTransactions = txState.status === 'success' ? txState.transactions : []
+  const periodTransactions = filterTransactionsByPeriod(allTransactions, period)
+  const summary = calculateOverviewSummary(periodTransactions)
+
+  const hasAnyTransactions = allTransactions.length > 0
+  const hasPeriodTransactions = periodTransactions.length > 0
+
+  // Determine summary card display values
+  let spendingValue: string | null = null
+  let spendingHint = NO_DATA_HINT
+
+  let incomeValue: string | null = null
+  let incomeHint = NO_DATA_HINT
+
+  let savingsValue: string | null = null
+  let savingsHint = NO_DATA_HINT
+
+  if (txState.status === 'loading') {
+    spendingHint = 'Loading your journal…'
+    incomeHint = 'Loading your journal…'
+    savingsHint = 'Loading your journal…'
+  } else if (txState.status === 'error') {
+    spendingHint = 'Unable to load spending'
+    incomeHint = 'Unable to load income'
+    savingsHint = 'Unable to load savings'
+  } else if (hasAnyTransactions) {
+    if (hasPeriodTransactions) {
+      spendingValue = `₹${formatAmount(summary.totalExpenses.toFixed(2))}`
+      spendingHint = `Total outflows in ${periodLabel.toLowerCase()}`
+
+      incomeValue = `₹${formatAmount(summary.totalIncome.toFixed(2))}`
+      incomeHint = `Total inflows in ${periodLabel.toLowerCase()}`
+
+      savingsValue = `${summary.netSavings >= 0 ? '+' : '−'}₹${formatAmount(
+        Math.abs(summary.netSavings).toFixed(2),
+      )}`
+      savingsHint =
+        summary.netSavings >= 0 ? 'Surplus retained this period' : 'Outflows exceeded income'
+    } else {
+      // User has transactions overall, but none in this specific selected period
+      spendingValue = '₹0.00'
+      spendingHint = `No spending in ${periodLabel.toLowerCase()}`
+
+      incomeValue = '₹0.00'
+      incomeHint = `No income in ${periodLabel.toLowerCase()}`
+
+      savingsValue = '₹0.00'
+      savingsHint = `No activity in ${periodLabel.toLowerCase()}`
+    }
+  }
+
   return (
     <AnimatedPage>
       <PageIntro
         eyebrow="Your money journal"
         title="A calm view of where your money goes"
-        description="Once you import statements, this page will summarise spending, income and budgets for the selected period."
+        description="A clear summary of your spending, income, and category breakdowns for the selected reporting period."
         actions={<PeriodBadge />}
       />
 
+      {txState.status === 'error' && (
+        <Reveal>
+          <div
+            role="alert"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-terracotta/40 bg-terracotta/10 p-4 text-sm text-[#8a3f29]"
+          >
+            <div className="flex items-center gap-2.5">
+              <CloudOff className="size-5 shrink-0 text-terracotta" aria-hidden="true" />
+              <span>{txState.message}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={txState.reload}
+              className="gap-1.5 self-start sm:self-auto border-terracotta/40 bg-card hover:bg-paper"
+            >
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+              <span>Try again</span>
+            </Button>
+          </div>
+        </Reveal>
+      )}
+
       <Reveal className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total spending" icon={Receipt} value={null} hint={NO_DATA_HINT} accent="forest" />
-        <StatCard label="Income" icon={Wallet} value={null} hint={NO_DATA_HINT} accent="sage" />
-        <StatCard label="Net savings" icon={TrendingUp} value={null} hint={NO_DATA_HINT} accent="butter" />
-        <StatCard label="Budget used" icon={Target} value={null} hint="Available once budgets are set" accent="terracotta" />
+        <StatCard
+          label="Total spending"
+          icon={Receipt}
+          value={spendingValue}
+          hint={spendingHint}
+          accent="forest"
+        />
+        <StatCard
+          label="Income"
+          icon={Wallet}
+          value={incomeValue}
+          hint={incomeHint}
+          accent="sage"
+        />
+        <StatCard
+          label="Net savings"
+          icon={TrendingUp}
+          value={savingsValue}
+          hint={savingsHint}
+          accent="butter"
+        />
+        <StatCard
+          label="Budget used"
+          icon={Target}
+          value={null}
+          hint="Available once budgets are set"
+          accent="terracotta"
+        />
       </Reveal>
 
       <Reveal className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -68,20 +177,24 @@ export function OverviewPage() {
           <CardHeader>
             <div>
               <CardTitle>Spending over time</CardTitle>
-              <CardDescription>Daily spending for the selected period.</CardDescription>
+              <CardDescription>Daily spending for {periodLabel.toLowerCase()}.</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
             <TrendChart
-              data={[]}
-              ariaLabel="Spending over time"
-              emptyTitle="No spending data yet"
-              emptyDescription="Your spending trend will be charted here after transactions are imported."
+              data={summary.spendingTrend}
+              ariaLabel={`Spending over time for ${periodLabel}`}
+              emptyTitle={hasAnyTransactions ? 'No spending in this period' : 'No spending data yet'}
+              emptyDescription={
+                hasAnyTransactions
+                  ? `No expenses were recorded for ${periodLabel.toLowerCase()}.`
+                  : 'Your spending trend will be charted here after transactions are imported.'
+              }
             />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
             <div>
               <CardTitle>Top categories</CardTitle>
@@ -89,12 +202,9 @@ export function OverviewPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
-            <EmptyState
-              size="compact"
-              icon={Receipt}
-              title="No categories yet"
-              description="Categories are assigned automatically once transactions exist."
-              className="flex-1"
+            <TopCategoriesBreakdown
+              categories={summary.topCategories}
+              periodLabel={periodLabel}
             />
           </CardContent>
         </Card>
@@ -169,4 +279,3 @@ export function OverviewPage() {
     </AnimatedPage>
   )
 }
-
