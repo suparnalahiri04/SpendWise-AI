@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  CalendarClock,
   FileText,
   LayoutDashboard,
   PiggyBank,
@@ -41,6 +42,12 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     path: '/budgets',
     icon: PiggyBank,
     description: 'Monthly spending limits by category',
+  },
+  {
+    label: 'Recurring',
+    path: '/recurring',
+    icon: CalendarClock,
+    description: 'Scheduled bills, subscriptions and routines',
   },
   {
     label: 'Insights',

@@ -5,10 +5,10 @@ const amountFormatter = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 2,
 })
 
-/** Format a decimal string for display; returns the raw value if it is not numeric. */
-export function formatAmount(value: string): string {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? amountFormatter.format(parsed) : value
+/** Format a decimal string or number for display; returns the raw value if it is not numeric. */
+export function formatAmount(value: string | number): string {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? amountFormatter.format(parsed) : String(value)
 }
 
 /** Format an ISO date (YYYY-MM-DD) without timezone shifting. */

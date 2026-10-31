@@ -1,4 +1,3 @@
-
 import os
 
 from fastapi import FastAPI
@@ -7,6 +6,9 @@ from app.statements import router as statements_router
 from app.auth import router as auth_router
 from app.transactions import router as transactions_router
 from app.ml_routes import router as ml_router
+from app.budgets import router as budgets_router
+from app.recurring_payments import router as recurring_payments_router
+from app.insights import router as insights_router
 
 app = FastAPI(
     title="SpendWise AI API",
@@ -34,6 +36,9 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(transactions_router)
+app.include_router(budgets_router)
+app.include_router(recurring_payments_router)
+app.include_router(insights_router)
 app.include_router(statements_router)
 app.include_router(ml_router)
 

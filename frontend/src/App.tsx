@@ -9,6 +9,7 @@ import { InsightsPage } from '@/pages/InsightsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { OverviewPage } from '@/pages/OverviewPage'
+import { RecurringPage } from '@/pages/RecurringPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { StatementsPage } from '@/pages/StatementsPage'
@@ -28,6 +29,7 @@ function AuthenticatedApp() {
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/statements" element={<StatementsPage />} />
             <Route path="/budgets" element={<BudgetsPage />} />
+            <Route path="/recurring" element={<RecurringPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
