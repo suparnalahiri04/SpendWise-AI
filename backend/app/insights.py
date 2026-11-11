@@ -3,13 +3,15 @@ from decimal import Decimal
 import re
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth_dependencies import get_current_user
+from app.budgets import classify_budget_status
 from app.dependencies import get_db
 from app.models import Budget, RecurringPayment, Transaction, User
 from app.recurring_payments import calculate_monthly_equivalent
+from app.timezone import get_current_ist_date, get_current_ist_month
 from app.schemas import (
     FinancialInsightsResponse,
     InsightItem,
@@ -20,6 +22,76 @@ from app.schemas import (
 router = APIRouter(prefix="/insights", tags=["Financial Insights"])
 
 MIN_ANOMALY_BASELINE_COUNT = 3
+
+
+def check_transaction_anomaly(
+    tx: Transaction,
+    cat_history: list[Transaction],
+) -> tuple[bool, float, float, float]:
+    """Evaluate whether an expense transaction is a statistical outlier against its category baseline.
+
+    Statistical criteria:
+    - Minimum baseline count: 3 transactions in the same category (excluding the evaluated tx).
+    - If history is insufficient (< 3), no alert is generated.
+    - If variance > 0: z-score >= 2.5, amount >= mean * 1.5, and (amount - mean) >= 10.00.
+    - If variance == 0: amount >= mean * 1.5 and (amount - mean) >= 10.00.
+    - Excludes candidate transaction from its own baseline.
+
+    Returns:
+        (is_outlier, mean_val, std_dev, z_score)
+    """
+    if len(cat_history) < MIN_ANOMALY_BASELINE_COUNT:
+        return False, 0.0, 0.0, 0.0
+
+    amounts = [float(t.amount) for t in cat_history]
+    n = len(amounts)
+    mean_val = sum(amounts) / n
+
+    if n > 1:
+        variance = sum((x - mean_val) ** 2 for x in amounts) / (n - 1)
+        std_dev = variance ** 0.5
+    else:
+        std_dev = 0.0
+
+    tx_amt = float(tx.amount)
+    diff_from_mean = tx_amt - mean_val
+    is_outlier = False
+    z_score = 0.0
+
+    if diff_from_mean >= 10.0 and tx_amt >= mean_val * 1.5:
+        if std_dev > 0.0:
+            z_score = diff_from_mean / std_dev
+            if z_score >= 2.5:
+                is_outlier = True
+        else:
+            # Zero variance: historical spending was identical
+            is_outlier = True
+
+    return is_outlier, mean_val, std_dev, z_score
+
+
+def format_anomaly_description(
+    amount: Decimal,
+    date_str: str,
+    category: str,
+    mean_dec: Decimal,
+    std_dev: float,
+    z_score: float,
+) -> str:
+    """Format human-readable anomaly description in INR (₹) distinguishing zero-variance
+
+    baselines from standard deviation departures.
+    """
+    if std_dev > 0.0:
+        return (
+            f"Transaction of ₹{amount:,.2f} on {date_str} in {category} "
+            f"is significantly higher than your typical average of ₹{mean_dec:,.2f} "
+            f"({z_score:.1f} standard deviations above baseline)."
+        )
+    return (
+        f"Transaction of ₹{amount:,.2f} on {date_str} in {category} "
+        f"is higher than your fixed baseline of ₹{mean_dec:,.2f}."
+    )
 
 
 def detect_unusual_expenses(
@@ -59,58 +131,26 @@ def detect_unusual_expenses(
             if (t.id != tx.id if (t.id is not None and tx.id is not None) else t is not tx)
         ]
 
-        if len(cat_history) < MIN_ANOMALY_BASELINE_COUNT:
-            # Insufficient historical observations to establish a statistical baseline
-            continue
-
-        amounts = [float(t.amount) for t in cat_history]
-        n = len(amounts)
-        mean_val = sum(amounts) / n
-
-        # Calculate sample standard deviation
-        if n > 1:
-            variance = sum((x - mean_val) ** 2 for x in amounts) / (n - 1)
-            std_dev = variance ** 0.5
-        else:
-            std_dev = 0.0
-
-        tx_amt = float(tx.amount)
-        diff_from_mean = tx_amt - mean_val
-
-        # Check outlier criteria
-        is_outlier = False
-        z_score = 0.0
-
-        if diff_from_mean >= 10.0 and tx_amt >= mean_val * 1.5:
-            if std_dev > 0.0:
-                z_score = diff_from_mean / std_dev
-                if z_score >= 2.5:
-                    is_outlier = True
-            else:
-                # Zero variance: historical spending was identical
-                is_outlier = True
+        is_outlier, mean_val, std_dev, z_score = check_transaction_anomaly(tx, cat_history)
 
         if is_outlier:
             tx_date = tx.transaction_date.date() if isinstance(tx.transaction_date, datetime) else tx.transaction_date
             date_str = tx_date.strftime("%Y-%m-%d")
+            diff_from_mean = float(tx.amount) - mean_val
             pct_above_mean = (diff_from_mean / mean_val) * 100 if mean_val > 0 else 0.0
             mean_dec = Decimal(str(round(mean_val, 2)))
 
-            if std_dev > 0.0:
-                metric_label = f"+{pct_above_mean:.0f}% vs avg"
-                desc = (
-                    f"Transaction of ₹{tx.amount:,.2f} on {date_str} in {cat} "
-                    f"is significantly higher than your typical average of ₹{mean_dec:,.2f} "
-                    f"({z_score:.1f} standard deviations above baseline)."
-                )
-            else:
-                metric_label = f"+{pct_above_mean:.0f}% vs avg"
-                desc = (
-                    f"Transaction of ₹{tx.amount:,.2f} on {date_str} in {cat} "
-                    f"is higher than your fixed baseline of ₹{mean_dec:,.2f}."
-                )
+            metric_label = f"+{pct_above_mean:.0f}% vs avg"
+            desc = format_anomaly_description(
+                amount=tx.amount,
+                date_str=date_str,
+                category=cat,
+                mean_dec=mean_dec,
+                std_dev=std_dev,
+                z_score=z_score,
+            )
 
-            tx_ident = tx.id if tx.id is not None else f"{cat}-{int(tx_amt)}"
+            tx_ident = tx.id if tx.id is not None else f"{cat}-{int(float(tx.amount))}"
             anomaly_insights.append(
                 InsightItem(
                     id=f"anomaly-tx-{tx_ident}-{selected_month}",
@@ -165,24 +205,37 @@ def generate_budget_insights(
 
         pct_used = round(float(spent / b.limit_amount) * 100, 2)
         slug = slugify_category(b.category)
+        status = classify_budget_status(spent, b.limit_amount)
 
-        if pct_used >= 100.0:
+        if status in ("over_budget", "limit_reached"):
+            is_limit_reached = status == "limit_reached"
+            title = (
+                f"Budget limit reached: {b.category}"
+                if is_limit_reached
+                else f"Budget exceeded: {b.category}"
+            )
+            description = (
+                f"You have reached 100.0% of your {b.category} budget "
+                f"(₹{spent:,.2f} of ₹{b.limit_amount:,.2f})."
+                if is_limit_reached
+                else (
+                    f"You have spent ₹{spent:,.2f} of your ₹{b.limit_amount:,.2f} "
+                    f"budget for {b.category} ({pct_used:.1f}% used)."
+                )
+            )
             budget_insights.append(
                 InsightItem(
                     id=f"budget-exceeded-{slug}-{selected_month}",
                     type="recommendation",
                     severity="critical",
-                    title=f"Budget exceeded: {b.category}",
-                    description=(
-                        f"You have spent ₹{spent:,.2f} of your ₹{b.limit_amount:,.2f} "
-                        f"budget for {b.category} ({pct_used:.1f}% used)."
-                    ),
+                    title=title,
+                    description=description,
                     category=b.category,
                     amount=spent,
                     metric_label=f"{pct_used:.1f}%",
                 )
             )
-        elif pct_used >= 80.0:
+        elif status == "approaching_limit":
             budget_insights.append(
                 InsightItem(
                     id=f"budget-warning-{slug}-{selected_month}",
@@ -290,6 +343,20 @@ def get_month_datetime_range(month_str: str) -> tuple[datetime, datetime]:
     return start_dt, end_dt
 
 
+def get_month_date_range(month_str: str) -> tuple[date, date]:
+    """Return (start_date, end_date) as inclusive calendar date objects covering the given YYYY-MM month."""
+    parts = month_str.split("-")
+    year = int(parts[0])
+    month = int(parts[1])
+    start_date = date(year, month, 1)
+    if month == 12:
+        next_month_start = date(year + 1, 1, 1)
+    else:
+        next_month_start = date(year, month + 1, 1)
+    end_date = next_month_start - timedelta(days=1)
+    return start_date, end_date
+
+
 def get_previous_month(month_str: str) -> str:
     """Return the YYYY-MM string for the calendar month immediately preceding month_str."""
     parts = month_str.split("-")
@@ -317,19 +384,21 @@ def get_financial_insights(
     elif ref_date is not None:
         selected_month = ref_date.strftime("%Y-%m")
     else:
-        selected_month = datetime.now(timezone.utc).strftime("%Y-%m")
+        selected_month = get_current_ist_month()
 
     prev_month = get_previous_month(selected_month)
     curr_start_dt, curr_end_dt = get_month_datetime_range(selected_month)
     prev_start_dt, prev_end_dt = get_month_datetime_range(prev_month)
+    curr_start_date, curr_end_date = get_month_date_range(selected_month)
+    prev_start_date, prev_end_date = get_month_date_range(prev_month)
 
     # 1. Current month transactions for authenticated user
     curr_txs = list(
         db.scalars(
             select(Transaction).where(
                 Transaction.user_id == current_user.id,
-                Transaction.transaction_date >= curr_start_dt,
-                Transaction.transaction_date < curr_end_dt,
+                func.date(Transaction.transaction_date) >= curr_start_date,
+                func.date(Transaction.transaction_date) <= curr_end_date,
             )
         ).all()
     )
@@ -348,11 +417,14 @@ def get_financial_insights(
         db.scalars(
             select(Transaction).where(
                 Transaction.user_id == current_user.id,
-                Transaction.transaction_date >= prev_start_dt,
-                Transaction.transaction_date < prev_end_dt,
+                func.date(Transaction.transaction_date) >= prev_start_date,
+                func.date(Transaction.transaction_date) <= prev_end_date,
             )
         ).all()
     )
+
+    effective_ref_date = ref_date or get_current_ist_date()
+    total_days_in_month = (curr_end_date - curr_start_date).days + 1
 
     if not prev_txs:
         # User has no transaction history for the previous month
@@ -364,8 +436,15 @@ def get_financial_insights(
             Decimal("0.00"),
         )
         if total_prev_spent > 0:
-            diff = total_curr_spent - total_prev_spent
-            mom_change_pct = round(float(diff / total_prev_spent) * 100, 2)
+            if total_curr_spent > 0:
+                diff = total_curr_spent - total_prev_spent
+                mom_change_pct = round(float(diff / total_prev_spent) * 100, 2)
+            elif effective_ref_date > curr_end_date:
+                # Closed past month with genuine zero spending
+                mom_change_pct = -100.0
+            else:
+                # In-progress month with no recorded spending yet: comparison lacks a valid baseline
+                mom_change_pct = None
         elif total_curr_spent == 0:
             mom_change_pct = 0.0
         else:
@@ -399,13 +478,10 @@ def get_financial_insights(
     else:
         fixed_commitment_ratio = None
 
-    # 5. Projected month-end expense
-    total_days_in_month = (curr_end_dt.date() - curr_start_dt.date()).days
-    effective_ref_date = ref_date or datetime.now(timezone.utc).date()
-
-    if effective_ref_date < curr_start_dt.date():
+    # 5. Projected month-end expense (linear daily run-rate extrapolation)
+    if effective_ref_date < curr_start_date:
         day_of_month = 1
-    elif effective_ref_date >= curr_end_dt.date():
+    elif effective_ref_date > curr_end_date:
         day_of_month = total_days_in_month
     else:
         day_of_month = effective_ref_date.day
@@ -470,7 +546,7 @@ def get_financial_insights(
         )
 
     # 7. Category-level spending pattern insights (expenses only)
-    if total_prev_spent is not None:
+    if total_prev_spent is not None and total_curr_spent > 0:
         curr_cat_expenses: dict[str, Decimal] = {}
         for t in curr_txs:
             if t.transaction_type == "expense":
@@ -547,22 +623,43 @@ def get_financial_insights(
                     )
                 )
             elif p_amt > 0 and c_amt == 0:
-                # Category had spending in previous month but dropped to zero
-                category_insights.append(
-                    InsightItem(
-                        id=f"cat-decrease-{slug}-{selected_month}",
-                        type="pattern",
-                        severity="positive",
-                        title=f"No spending in {cat}",
-                        description=(
-                            f"No spending in {cat} this month, saving "
-                            f"₹{p_amt:,.2f} compared to {prev_month}."
-                        ),
-                        category=cat,
-                        amount=p_amt,
-                        metric_label="-100.0%",
+                # Category had spending in previous month but zero recorded so far in current month
+                if effective_ref_date <= curr_end_date:
+                    # In-progress month: zero MTD expenses does not imply projected allocation is zero
+                    # or that a genuine 100% savings reduction occurred.
+                    category_insights.append(
+                        InsightItem(
+                            id=f"cat-decrease-{slug}-{selected_month}",
+                            type="pattern",
+                            severity="info",
+                            title=f"No spending recorded in {cat}",
+                            description=(
+                                f"No expenses have been recorded for {cat} so far in {selected_month} "
+                                f"(compared to ₹{p_amt:,.2f} in {prev_month}). "
+                                "Spending or scheduled commitments may still occur before month-end."
+                            ),
+                            category=cat,
+                            amount=Decimal("0.00"),
+                            metric_label=None,
+                        )
                     )
-                )
+                else:
+                    # Closed historical month with verified zero spending
+                    category_insights.append(
+                        InsightItem(
+                            id=f"cat-decrease-{slug}-{selected_month}",
+                            type="pattern",
+                            severity="positive",
+                            title=f"No spending in {cat}",
+                            description=(
+                                f"No spending was recorded in {cat} during {selected_month}, "
+                                f"saving ₹{p_amt:,.2f} compared to {prev_month}."
+                            ),
+                            category=cat,
+                            amount=p_amt,
+                            metric_label="-100.0%",
+                        )
+                    )
 
         # Sort category insights by impact (largest absolute difference first, then category name)
         category_insights.sort(
@@ -578,7 +675,7 @@ def get_financial_insights(
             select(Transaction).where(
                 Transaction.user_id == current_user.id,
                 Transaction.transaction_type == "expense",
-                Transaction.transaction_date < curr_end_dt,
+                func.date(Transaction.transaction_date) <= curr_end_date,
             )
         ).all()
     )

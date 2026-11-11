@@ -81,9 +81,9 @@ export function InsightCard({ insight }: InsightCardProps) {
   const { icon: Icon, iconClass, badgeTone, typeLabel } = getInsightVisuals(insight)
 
   return (
-    <Card className="flex flex-col justify-between transition-all hover:shadow-card-hover min-w-0 overflow-hidden">
-      <CardHeader className="space-y-3 pb-3 min-w-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+    <Card className="flex flex-col justify-between transition-all hover:shadow-elevated min-w-0 overflow-hidden">
+      <CardHeader className="flex flex-col items-stretch justify-start gap-3 pb-3 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 min-w-0 w-full">
           <div className="flex shrink-0 items-center gap-2">
             <span
               className={cn(
@@ -117,7 +117,7 @@ export function InsightCard({ insight }: InsightCardProps) {
           </div>
         </div>
 
-        <CardTitle className="font-serif text-lg font-bold text-ink leading-snug break-words hyphens-auto [overflow-wrap:anywhere]">
+        <CardTitle className="font-display text-lg font-bold text-ink leading-snug break-words hyphens-none">
           {insight.title}
         </CardTitle>
       </CardHeader>

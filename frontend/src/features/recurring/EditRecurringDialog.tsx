@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { ApiError } from '@/lib/api/client'
 import { updateRecurringPayment } from '@/lib/api/recurring'
 import {
@@ -76,6 +77,7 @@ function EditRecurringForm({ payment, onCancel, onSuccess }: EditRecurringFormPr
         status,
       })
 
+      notifyFinancialMutation('recurring:updated')
       setSubmitting(false)
       onSuccess()
     } catch (err: unknown) {

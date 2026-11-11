@@ -2,13 +2,13 @@ import { Check, CopyCheck, FileSpreadsheet, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { PageIntro } from '@/components/common/PageIntro'
 import { AnimatedPage, Reveal } from '@/components/motion/AnimatedPage'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatementHistoryTable } from '@/features/statements/StatementHistoryTable'
 import { StatementImportResultCard } from '@/features/statements/StatementImportResultCard'
 import { StatementPreviewTable } from '@/features/statements/StatementPreviewTable'
 import { StatementUploadArea } from '@/features/statements/StatementUploadArea'
 import { useStatementHistory } from '@/features/statements/useStatementHistory'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { ApiError } from '@/lib/api/client'
 import { importStatement, previewStatement } from '@/lib/api/statements'
 import type { StatementImportResult, StatementPreviewResponse } from '@/lib/api/types'
@@ -56,6 +56,7 @@ export function StatementsPage() {
 
     try {
       const result = await importStatement(currentFile)
+      notifyFinancialMutation('statement:imported')
       setImportResult(result)
       setStep('result')
       historyState.reload()
@@ -94,21 +95,16 @@ export function StatementsPage() {
       >
         <Card className={cn(step === 'preview' ? 'lg:col-span-1' : 'lg:col-span-2')}>
           <CardHeader>
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>
-                  {step === 'upload' && 'Import a statement'}
-                  {step === 'preview' && 'Review Statement Preview'}
-                  {step === 'result' && 'Import Summary'}
-                </CardTitle>
-                <CardDescription>
-                  {step === 'upload' && 'Upload a bank or credit card statement file (.csv or .xlsx).'}
-                  {step === 'preview' && 'Check parsed transactions before saving them to your ledger.'}
-                  {step === 'result' && 'Statement transactions have been processed.'}
-                </CardDescription>
-              </div>
-              {step === 'upload' && <Badge tone="sage">CSV & XLSX</Badge>}
-            </div>
+            <CardTitle>
+              {step === 'upload' && 'Import a statement'}
+              {step === 'preview' && 'Review Statement Preview'}
+              {step === 'result' && 'Import Summary'}
+            </CardTitle>
+            <CardDescription>
+              {step === 'upload' && 'Upload a bank or credit card statement file (.csv or .xlsx).'}
+              {step === 'preview' && 'Check parsed transactions before saving them to your ledger.'}
+              {step === 'result' && 'Statement transactions have been processed.'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {step === 'upload' && (
@@ -141,45 +137,64 @@ export function StatementsPage() {
           <Card>
             <CardHeader>
               <CardTitle>What to expect</CardTitle>
-              <CardDescription>How statement processing works</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="flex flex-col gap-4 text-sm">
-                <li className="flex gap-3">
-                  <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-forest-soft" aria-hidden="true" />
-                  <span>
-                    <span className="font-medium text-ink">CSV & Excel statements</span>
-                    <span className="block text-muted-foreground">
+                <li className="flex items-start gap-3">
+                  <div
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sage/35 text-forest"
+                    aria-hidden="true"
+                  >
+                    <FileSpreadsheet className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">CSV & Excel statements</p>
+                    <p className="text-muted-foreground">
                       Accepts standard bank CSV and XLSX files up to 5 MB in size.
-                    </span>
-                  </span>
+                    </p>
+                  </div>
                 </li>
-                <li className="flex gap-3">
-                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-forest-soft" aria-hidden="true" />
-                  <span>
-                    <span className="font-medium text-ink">Pre-import validation</span>
-                    <span className="block text-muted-foreground">
+                <li className="flex items-start gap-3">
+                  <div
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sage/35 text-forest"
+                    aria-hidden="true"
+                  >
+                    <ShieldCheck className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">Pre-import validation</p>
+                    <p className="text-muted-foreground">
                       Checks dates, amounts, and descriptions. Invalid rows are flagged before any database writes.
-                    </span>
-                  </span>
+                    </p>
+                  </div>
                 </li>
-                <li className="flex gap-3">
-                  <CopyCheck className="mt-0.5 size-4 shrink-0 text-forest-soft" aria-hidden="true" />
-                  <span>
-                    <span className="font-medium text-ink">Duplicate prevention</span>
-                    <span className="block text-muted-foreground">
+                <li className="flex items-start gap-3">
+                  <div
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sage/35 text-forest"
+                    aria-hidden="true"
+                  >
+                    <CopyCheck className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">Duplicate prevention</p>
+                    <p className="text-muted-foreground">
                       Entries matching existing transactions are safely skipped to keep your accounts accurate.
-                    </span>
-                  </span>
+                    </p>
+                  </div>
                 </li>
-                <li className="flex gap-3">
-                  <Check className="mt-0.5 size-4 shrink-0 text-forest-soft" aria-hidden="true" />
-                  <span>
-                    <span className="font-medium text-ink">Full review control</span>
-                    <span className="block text-muted-foreground">
+                <li className="flex items-start gap-3">
+                  <div
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sage/35 text-forest"
+                    aria-hidden="true"
+                  >
+                    <Check className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-ink">Full review control</p>
+                    <p className="text-muted-foreground">
                       Imported transactions appear in your ledger ready for inspection and category adjustment.
-                    </span>
-                  </span>
+                    </p>
+                  </div>
                 </li>
               </ul>
             </CardContent>

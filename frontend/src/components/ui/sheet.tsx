@@ -12,11 +12,12 @@ import { cn } from '@/lib/utils'
 interface SheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  header?: ReactNode
   children: ReactNode
   className?: string
 }
 
-export function Sheet({ open, onOpenChange, children, className }: SheetProps) {
+export function Sheet({ open, onOpenChange, header, children, className }: SheetProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <AnimatePresence>
@@ -34,7 +35,7 @@ export function Sheet({ open, onOpenChange, children, className }: SheetProps) {
             <DialogPrimitive.Content forceMount asChild>
               <motion.div
                 className={cn(
-                  'fixed inset-y-0 left-0 z-50 flex w-[min(19rem,86vw)] flex-col border-r border-border bg-background shadow-popover outline-none',
+                  'fixed inset-y-0 left-0 z-50 flex w-[min(19rem,86vw)] flex-col overflow-hidden border-r border-border bg-background shadow-popover outline-none',
                   className,
                 )}
                 initial={{ x: '-100%' }}
@@ -42,7 +43,17 @@ export function Sheet({ open, onOpenChange, children, className }: SheetProps) {
                 exit={{ x: '-100%' }}
                 transition={transitions.drawer}
               >
-                {children}
+                {header ? (
+                  <div data-slot="sheet-header" className="relative z-20 shrink-0">
+                    {header}
+                  </div>
+                ) : null}
+                <div
+                  data-slot="sheet-scroll"
+                  className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+                >
+                  {children}
+                </div>
               </motion.div>
             </DialogPrimitive.Content>
           </DialogPrimitive.Portal>
@@ -63,5 +74,10 @@ export function SheetDescription({
   return <DialogPrimitive.Description className={cn('sr-only', className)} {...props} />
 }
 
-export const SheetClose = DialogPrimitive.Close
+export function SheetClose({
+  className,
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close className={cn('z-20', className)} {...props} />
+}
 

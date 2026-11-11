@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { createBudget } from '@/lib/api/budgets'
 import { ApiError } from '@/lib/api/client'
 import { BUDGET_EXPENSE_CATEGORIES } from '@/lib/api/types'
@@ -74,6 +75,7 @@ export function SetBudgetDialog({
         limit_amount: Number(limitAmount),
       })
 
+      notifyFinancialMutation('budget:created')
       resetForm()
       onOpenChange(false)
       onSuccess()

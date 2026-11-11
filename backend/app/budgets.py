@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth_dependencies import get_current_user
 from app.dependencies import get_db
 from app.models import Budget, Transaction, User
+from app.timezone import get_current_ist_month
 from app.schemas import (
     BudgetCreate,
     BudgetProgressItem,
@@ -31,6 +32,26 @@ def get_month_datetime_range(month_str: str) -> tuple[datetime, datetime]:
     else:
         end_dt = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     return start_dt, end_dt
+
+
+def classify_budget_status(spent: Decimal, limit: Decimal) -> str:
+    """Classify budget utilization according to standardized domain rules:
+    - Below 80%: 'on_track'
+    - 80% to below 100%: 'approaching_limit'
+    - Exactly 100%: 'limit_reached'
+    - Above 100%: 'over_budget'
+
+    Uses exact Decimal comparisons on unrounded values.
+    """
+    if limit <= Decimal("0.00"):
+        return "on_track"
+    if spent > limit:
+        return "over_budget"
+    if spent == limit:
+        return "limit_reached"
+    if spent * Decimal("100") >= limit * Decimal("80"):
+        return "approaching_limit"
+    return "on_track"
 
 
 @router.post(
@@ -126,7 +147,7 @@ def get_budget_progress(
     if isinstance(month, str) and month.strip():
         selected_month = month.strip()
     else:
-        selected_month = datetime.now(timezone.utc).strftime("%Y-%m")
+        selected_month = get_current_ist_month()
     start_dt, end_dt = get_month_datetime_range(selected_month)
 
     budgets = list(
@@ -163,6 +184,7 @@ def get_budget_progress(
         remaining = limit - spent
         pct = round(float(spent / limit) * 100, 2) if limit > 0 else 0.0
         is_exceeded = spent > limit
+        b_status = classify_budget_status(spent, limit)
 
         items.append(
             BudgetProgressItem(
@@ -174,6 +196,7 @@ def get_budget_progress(
                 remaining_amount=remaining,
                 percentage_used=pct,
                 is_exceeded=is_exceeded,
+                status=b_status,
             )
         )
         total_budgeted += limit
@@ -253,6 +276,7 @@ def get_single_budget_progress(
     remaining = limit - spent
     pct = round(float(spent / limit) * 100, 2) if limit > 0 else 0.0
     is_exceeded = spent > limit
+    b_status = classify_budget_status(spent, limit)
 
     return BudgetProgressItem(
         id=budget.id,
@@ -263,6 +287,7 @@ def get_single_budget_progress(
         remaining_amount=remaining,
         percentage_used=pct,
         is_exceeded=is_exceeded,
+        status=b_status,
     )
 
 

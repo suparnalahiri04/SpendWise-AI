@@ -77,11 +77,15 @@ describe('OverviewPage', () => {
 
     renderOverview()
 
-    // Top cards show empty placeholder dash
-    expect(await screen.findAllByText('—')).toHaveLength(4)
-    expect(screen.getByText('Total spending')).toBeInTheDocument()
+    // Top cards show empty placeholder dash for 3 primary KPI cards
+    expect(await screen.findAllByText('—')).toHaveLength(3)
+    expect(screen.getByText('Total Income')).toBeInTheDocument()
+    expect(screen.getByText('Total Expenses')).toBeInTheDocument()
+    expect(screen.getByText('Net Savings')).toBeInTheDocument()
     expect(screen.getByText('No spending data yet')).toBeInTheDocument()
     expect(screen.getByText('No categories yet')).toBeInTheDocument()
+    // Adaptive section renders Getting started for new users
+    expect(screen.getByText('Getting started')).toBeInTheDocument()
   })
 
   it('calculates and displays spending, income, savings, and top categories from transactions', async () => {
@@ -133,7 +137,7 @@ describe('OverviewPage', () => {
 
     renderOverview()
 
-    // Total spending: 600 + 400 = 1,000.00
+    // Total spending (outflows): 600 + 400 = 1,000.00
     expect(await screen.findByText('₹1,000.00')).toBeInTheDocument()
     expect(screen.getByText(/total outflows in this month/i)).toBeInTheDocument()
 
@@ -144,14 +148,18 @@ describe('OverviewPage', () => {
     // Net savings: +₹49,000.00
     expect(screen.getByText('+₹49,000.00')).toBeInTheDocument()
 
-    // Budget used remains available once budgets are set
-    expect(screen.getByText(/available once budgets are set/i)).toBeInTheDocument()
-
     // Top categories list is rendered with breakdown
-    expect(screen.getByText('Food/Dining')).toBeInTheDocument()
+    expect(screen.getAllByText('Food/Dining').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('60%')).toBeInTheDocument()
-    expect(screen.getByText('Groceries')).toBeInTheDocument()
+    expect(screen.getAllByText('Groceries').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('40%')).toBeInTheDocument()
+
+    // Adaptive lower section renders Recent Transactions for established users
+    expect(screen.getByText('Recent transactions')).toBeInTheDocument()
+    expect(screen.getByText('Swiggy Biryani Order')).toBeInTheDocument()
+    expect(screen.getByText('Nature Basket Groceries')).toBeInTheDocument()
+    expect(screen.getByText('Monthly Salary Credited')).toBeInTheDocument()
+    expect(screen.queryByText('Getting started')).not.toBeInTheDocument()
   })
 
   it('updates dashboard calculations when reporting period changes to last-month', async () => {
@@ -202,7 +210,7 @@ describe('OverviewPage', () => {
     const matches = await screen.findAllByText('₹2,500.00')
     expect(matches.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/total outflows in last month/i)).toBeInTheDocument()
-    expect(screen.getByText('Bills/Utilities')).toBeInTheDocument()
+    expect(screen.getAllByText('Bills/Utilities').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('Food/Dining')).not.toBeInTheDocument()
   })
 

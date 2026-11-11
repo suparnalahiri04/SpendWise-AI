@@ -65,6 +65,13 @@ export const TRANSACTION_CATEGORIES = [
 
 export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number]
 
+export type StatementRowStatusCategory =
+  | 'success'
+  | 'pending'
+  | 'failed'
+  | 'missing'
+  | 'unknown'
+
 /** Row parsed and validated by POST /statements/preview. */
 export interface StatementPreviewRow {
   row_number: number
@@ -73,7 +80,14 @@ export interface StatementPreviewRow {
   amount: string | number | null
   transaction_type: TransactionType | null
   category: string
+  predicted_category?: string | null
+  prediction_confidence?: string | number | null
+  source_status?: string | null
+  status_category?: StatementRowStatusCategory | null
+  is_status_excluded?: boolean
+  exclusion_reason?: string | null
   is_valid: boolean
+  is_duplicate?: boolean
   errors: string[]
 }
 
@@ -82,7 +96,14 @@ export interface StatementPreviewResponse {
   filename: string
   total_rows: number
   valid_rows: number
+  importable_rows?: number
   invalid_rows: number
+  duplicate_rows?: number
+  status_excluded_rows?: number
+  pending_rows?: number
+  failed_rows?: number
+  missing_status_rows?: number
+  unknown_status_rows?: number
   preview: StatementPreviewRow[]
 }
 
@@ -131,6 +152,12 @@ export interface BudgetUpdatePayload {
   limit_amount: number
 }
 
+export type BudgetStatusSemantic =
+  | 'on_track'
+  | 'approaching_limit'
+  | 'limit_reached'
+  | 'over_budget'
+
 export interface BudgetProgressItem {
   id: number
   category: string
@@ -140,6 +167,7 @@ export interface BudgetProgressItem {
   remaining_amount: string | number
   percentage_used: number
   is_exceeded: boolean
+  status?: BudgetStatusSemantic | string | null
 }
 
 export interface BudgetProgressSummary {
@@ -246,5 +274,232 @@ export interface FinancialInsightsResponse {
   insights: InsightItem[]
 }
 
+/** AI Money Assistant types mirroring backend schemas (backend/app/schemas.py). */
+
+export type AssistantFactKind = 'fact' | 'estimate' | 'recommendation'
+export type AssistantEngine = 'deterministic' | 'llm'
+
+export interface AssistantFactItem {
+  metric_key: string
+  label: string
+  value_formatted: string
+  raw_amount: string | number | null
+  kind: AssistantFactKind
+  category: string | null
+  source: string
+  notes: string | null
+}
+
+export interface AssistantQueryPayload {
+  query: string
+  month?: string | null
+}
+
+export interface AssistantQueryResponse {
+  query: string
+  intent: string
+  answer_markdown: string
+  facts: AssistantFactItem[]
+  estimates: AssistantFactItem[]
+  recommendations: AssistantFactItem[]
+  data_limitations: string[]
+  suggested_followups: string[]
+  engine: AssistantEngine
+}
+
+export interface StarterPromptItem {
+  id: string
+  prompt: string
+  category: string
+}
+
+export interface StarterPromptsResponse {
+  prompts: StarterPromptItem[]
+}
+
+/** Savings Goals types mirroring backend schemas (backend/app/schemas.py). */
+
+export type GoalStatus = 'in_progress' | 'completed' | 'archived'
+
+export interface GoalContribution {
+  id: number
+  goal_id: number
+  user_id: number
+  amount: string | number
+  contribution_date: string // YYYY-MM-DD
+  notes: string | null
+  created_at: string | null
+}
+
+export interface GoalContributionCreatePayload {
+  amount: number
+  contribution_date?: string // YYYY-MM-DD
+  notes?: string
+}
+
+export interface SavingsGoal {
+  id: number
+  user_id: number
+  name: string
+  target_amount: string | number
+  target_date: string | null // YYYY-MM-DD
+  status: GoalStatus
+  total_contributed: string | number
+  remaining_amount: string | number
+  progress_pct: number
+  is_completed: boolean
+  is_on_track: boolean | null
+  days_remaining: number | null
+  recent_contributions: GoalContribution[]
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface SavingsGoalCreatePayload {
+  name: string
+  target_amount: number
+  target_date?: string | null
+}
+
+export interface SavingsGoalUpdatePayload {
+  name?: string
+  target_amount?: number
+  target_date?: string | null
+  status?: GoalStatus
+}
+
+export interface SavingsGoalsSummaryResponse {
+  total_target_amount: string | number
+  total_saved_amount: string | number
+  total_remaining_amount: string | number
+  overall_progress_pct: number
+  goals_count: number
+  completed_goals_count: number
+  items: SavingsGoal[]
+}
+
+// Financial Reports types
+
+export type ReportPeriod =
+  | 'this-month'
+  | 'last-month'
+  | 'last-3-months'
+  | 'year-to-date'
+  | 'all'
+  | 'custom'
+
+export interface ReportCategorySpending {
+  category: string
+  amount: string | number
+  transaction_count: number
+  percentage: number
+}
+
+export interface ReportSummaryResponse {
+  period: string
+  start_date: string | null // YYYY-MM-DD
+  end_date: string | null // YYYY-MM-DD
+  total_income: string | number
+  total_expenses: string | number
+  net_savings: string | number
+  savings_rate_pct: number | null
+  transaction_count: number
+  income_transaction_count: number
+  expense_transaction_count: number
+  categories: ReportCategorySpending[]
+  has_transactions: boolean
+}
+
+export interface ReportFilterParams {
+  period?: ReportPeriod
+  start_date?: string
+  end_date?: string
+}
+
+// Smart Financial Alerts types
+
+export type AlertType =
+  | 'budget_warning'
+  | 'budget_exceeded'
+  | 'recurring_upcoming'
+  | 'recurring_overdue'
+  | 'spending_anomaly'
+  | string
+
+export type AlertSeverity = 'info' | 'warning' | 'critical' | string
+
+export interface AlertItem {
+  id: string // stable alert_key
+  alert_type: AlertType
+  severity: AlertSeverity
+  title: string
+  message: string
+  created_at: string
+  link_to: string
+  metadata: Record<string, unknown>
+}
+
+export interface AlertListResponse {
+  alert_count: number
+  active_count: number
+  alerts: AlertItem[]
+}
+
+export interface AlertDismissResponse {
+  success: boolean
+  alert_key: string
+  message: string
+}
+
+export interface AlertDismissAllResponse {
+  success: boolean
+  dismissed_count: number
+  message: string
+}
+
+// Financial Forecasting types
+
+export type ForecastConfidenceLevel = 'low' | 'moderate' | 'high'
+
+export interface MonthlyForecastPoint {
+  month: string // YYYY-MM
+  month_label: string // e.g. "November 2026"
+  is_current_month: boolean
+  is_historical: boolean
+  actual_amount: string | number | null
+  predicted_amount: string | number
+  lower_bound: string | number
+  upper_bound: string | number
+  fixed_commitments: string | number
+  variable_estimate: string | number
+}
+
+export interface CategoryForecastItem {
+  category: string
+  predicted_amount: string | number
+  percentage: number // 0.0 to 100.0
+  fixed_amount: string | number
+  variable_amount: string | number
+}
+
+export interface ForecastSummaryResponse {
+  horizon_months: number
+  reference_date: string // ISO date YYYY-MM-DD
+  confidence_level: ForecastConfidenceLevel
+  confidence_score: number // 0.0 to 1.0
+  history_months_count: number
+  current_month_forecast: MonthlyForecastPoint
+  monthly_forecasts: MonthlyForecastPoint[]
+  category_forecasts: CategoryForecastItem[]
+  methodology_notes: string[]
+  limitations: string[]
+}
+
+export interface ForecastQueryParams {
+  horizon_months?: number
+  horizonMonths?: number
+  ref_date?: string
+  refDate?: string
+}
 
 

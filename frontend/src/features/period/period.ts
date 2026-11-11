@@ -10,6 +10,7 @@ export const PERIODS = [
   { id: 'last-month', label: 'Last month' },
   { id: 'last-3-months', label: 'Last 3 months' },
   { id: 'year-to-date', label: 'Year to date' },
+  { id: 'all', label: 'All time' },
 ] as const
 
 export type PeriodId = (typeof PERIODS)[number]['id']

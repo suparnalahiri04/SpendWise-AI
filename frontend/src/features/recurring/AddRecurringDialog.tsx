@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { ApiError } from '@/lib/api/client'
 import { createRecurringPayment } from '@/lib/api/recurring'
 import {
@@ -86,6 +87,7 @@ export function AddRecurringDialog({ open, onOpenChange, onSuccess }: AddRecurri
         next_due_date: nextDueDate || startDate || today,
       })
 
+      notifyFinancialMutation('recurring:created')
       resetForm()
       onOpenChange(false)
       onSuccess()

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth_dependencies import get_current_user
 from app.dependencies import get_db
 from app.models import User
+from app.rate_limiter import rate_limit_login, rate_limit_register
 from app.schemas import UserRegister, UserLogin, UserResponse, TokenResponse
 from app.security import hash_password, verify_password
 from app.token import create_access_token
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_register)],
 )
 def register_user(
     user_data: UserRegister,
@@ -54,7 +56,11 @@ def register_user(
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(rate_limit_login)],
+)
 def login_user(
     user_data: UserLogin,
     db: Session = Depends(get_db),

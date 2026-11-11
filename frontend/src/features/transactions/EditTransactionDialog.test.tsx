@@ -229,5 +229,40 @@ describe('EditTransactionDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('formats decimal, percentage, 59.9% boundary, and invalid confidence scores cleanly', () => {
+    const cases: Array<{ conf: string | null; expectedText: RegExp; forbidden?: RegExp }> = [
+      { conf: '0.599', expectedText: /Food\/Dining \(59\.9% confidence\)/, forbidden: /60%/ },
+      { conf: '0.60', expectedText: /Food\/Dining \(60% confidence\)/ },
+      { conf: '85', expectedText: /Food\/Dining \(85% confidence\)/, forbidden: /8500%/ },
+      { conf: 'not-a-number', expectedText: /Originally classified by AI as Food\/Dining\./, forbidden: /NaN%|Infinity%/ },
+      { conf: '', expectedText: /Originally classified by AI as Food\/Dining\./, forbidden: /0%/ },
+      { conf: null, expectedText: /Originally classified by AI as Food\/Dining\./, forbidden: /confidence/ },
+    ]
+
+    for (const c of cases) {
+      const { unmount } = render(
+        <EditTransactionDialog
+          open={true}
+          transaction={{
+            ...sampleTransaction,
+            predicted_category: 'Food/Dining',
+            prediction_confidence: c.conf as string | null,
+          }}
+          onOpenChange={vi.fn()}
+          onSuccess={vi.fn()}
+        />,
+      )
+      const banner = screen.getByText(
+        (_content, el) =>
+          el?.tagName === 'SPAN' && c.expectedText.test(el.textContent ?? ''),
+      )
+      expect(banner).toBeInTheDocument()
+      if (c.forbidden) {
+        expect(banner.textContent).not.toMatch(c.forbidden)
+      }
+      unmount()
+    }
+  })
 })
 

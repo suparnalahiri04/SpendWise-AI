@@ -33,7 +33,7 @@ export function StatementImportResultCard({ result, onReset }: StatementImportRe
 
         <div>
           <div className="flex items-center justify-center gap-2">
-            <h3 className="font-serif text-xl sm:text-2xl text-ink">
+            <h3 className="font-display text-xl sm:text-2xl text-ink">
               {isFullySuccessful ? 'Statement Imported Successfully' : 'Statement Import Completed'}
             </h3>
             <Badge tone={isFullySuccessful ? 'sage' : 'butter'}>

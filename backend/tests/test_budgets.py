@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.budgets import (
+    classify_budget_status,
     create_budget,
     delete_budget,
     get_budget,
@@ -310,6 +311,105 @@ class BudgetBackendTestCase(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             get_single_budget_progress(budget_id=b1.id, current_user=self.user2, db=self.db)
         self.assertEqual(ctx.exception.status_code, 404)
+
+    def test_budget_boundary_classification_semantics(self):
+        """Test standardized domain rules across all boundary thresholds:
+        - 79.99% -> 'on_track'
+        - 80.00% -> 'approaching_limit'
+        - 99.99% -> 'approaching_limit'
+        - 100.00% -> 'limit_reached' (NOT 'over_budget')
+        - 100.01% -> 'over_budget'
+        """
+        limit = Decimal("10000.00")
+
+        # 1. 79.99% -> on_track
+        self.assertEqual(classify_budget_status(Decimal("0.00"), limit), "on_track")
+        self.assertEqual(classify_budget_status(Decimal("5000.00"), limit), "on_track")
+        self.assertEqual(classify_budget_status(Decimal("7999.00"), limit), "on_track")
+
+        # Also test with limit=100 for exact 79.99
+        self.assertEqual(classify_budget_status(Decimal("79.99"), Decimal("100.00")), "on_track")
+
+        # 2. 80.00% -> approaching_limit
+        self.assertEqual(classify_budget_status(Decimal("8000.00"), limit), "approaching_limit")
+        self.assertEqual(classify_budget_status(Decimal("80.00"), Decimal("100.00")), "approaching_limit")
+
+        # 3. 99.99% -> approaching_limit
+        self.assertEqual(classify_budget_status(Decimal("9999.00"), limit), "approaching_limit")
+        self.assertEqual(classify_budget_status(Decimal("99.99"), Decimal("100.00")), "approaching_limit")
+
+        # 4. 100.00% -> limit_reached
+        self.assertEqual(classify_budget_status(Decimal("10000.00"), limit), "limit_reached")
+        self.assertEqual(classify_budget_status(Decimal("100.00"), Decimal("100.00")), "limit_reached")
+
+        # 5. 100.01% -> over_budget
+        self.assertEqual(classify_budget_status(Decimal("10001.00"), limit), "over_budget")
+        self.assertEqual(classify_budget_status(Decimal("100.01"), Decimal("100.00")), "over_budget")
+
+    def test_budget_progress_exact_100_percent_boundary(self):
+        """Verify that get_budget_progress correctly flags exactly 100% as limit_reached with is_exceeded=False."""
+        b_exact = Budget(
+            user_id=self.user1.id,
+            category="Utilities",
+            month="2026-10",
+            limit_amount=Decimal("3000.00"),
+        )
+        self.db.add(b_exact)
+        self.db.commit()
+
+        t_exact = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 10, 10, 10, 0, tzinfo=timezone.utc),
+            description="Electricity bill exactly at limit",
+            amount=Decimal("3000.00"),
+            transaction_type="expense",
+            category="Utilities",
+        )
+        self.db.add(t_exact)
+        self.db.commit()
+
+        prog = get_budget_progress(month="2026-10", current_user=self.user1, db=self.db)
+        item = next(i for i in prog.items if i.category == "Utilities")
+
+        self.assertEqual(item.spent_amount, Decimal("3000.00"))
+        self.assertEqual(item.remaining_amount, Decimal("0.00"))
+        self.assertEqual(item.percentage_used, 100.0)
+        self.assertFalse(item.is_exceeded, "Exactly 100% utilization must NOT be marked is_exceeded=True")
+        self.assertEqual(item.status, "limit_reached")
+
+    def test_budget_progress_rounded_percentage_100_below_limit(self):
+        """Verify that when rounded percentage_used rounds to 100.00 but actual spending is below limit,
+        status remains 'approaching_limit' and is_exceeded remains False.
+        """
+        b_near = Budget(
+            user_id=self.user1.id,
+            category="Health",
+            month="2026-10",
+            limit_amount=Decimal("10000.00"),
+        )
+        self.db.add(b_near)
+        self.db.commit()
+
+        # Spent 9,999.60 out of 10,000.00 -> 99.996%, which rounds to 100.00%
+        t_near = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 10, 12, 10, 0, tzinfo=timezone.utc),
+            description="Pharmacy expense near limit",
+            amount=Decimal("9999.60"),
+            transaction_type="expense",
+            category="Health",
+        )
+        self.db.add(t_near)
+        self.db.commit()
+
+        prog = get_budget_progress(month="2026-10", current_user=self.user1, db=self.db)
+        item = next(i for i in prog.items if i.category == "Health")
+
+        self.assertEqual(item.spent_amount, Decimal("9999.60"))
+        self.assertEqual(item.remaining_amount, Decimal("0.40"))
+        self.assertEqual(item.percentage_used, 100.0)  # rounded representation
+        self.assertEqual(item.status, "approaching_limit", "Unrounded check must prevent false limit_reached")
+        self.assertFalse(item.is_exceeded)
 
 
 if __name__ == "__main__":

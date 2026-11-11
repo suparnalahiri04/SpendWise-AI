@@ -16,13 +16,30 @@ interface DropdownMenuProps {
   children: ReactNode
   /** Non-modal by default so page scrolling is not locked while open. */
   modal?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function DropdownMenu({ children, modal = false }: DropdownMenuProps) {
-  const [open, setOpen] = useState(false)
+export function DropdownMenu({
+  children,
+  modal = false,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: DropdownMenuProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+
+  const handleOpenChange = (next: boolean) => {
+    if (!isControlled) {
+      setUncontrolledOpen(next)
+    }
+    controlledOnOpenChange?.(next)
+  }
+
   return (
     <OpenContext.Provider value={open}>
-      <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen} modal={modal}>
+      <DropdownMenuPrimitive.Root open={open} onOpenChange={handleOpenChange} modal={modal}>
         {children}
       </DropdownMenuPrimitive.Root>
     </OpenContext.Provider>

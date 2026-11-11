@@ -49,3 +49,14 @@ export async function updateTransaction(
     signal,
   })
 }
+
+/**
+ * DELETE /transactions/{id} — delete an owned transaction.
+ */
+export async function deleteTransaction(id: number, signal?: AbortSignal): Promise<void> {
+  await apiRequest<void>(`/transactions/${id}`, {
+    method: 'DELETE',
+    signal,
+  })
+}
+

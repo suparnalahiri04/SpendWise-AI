@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as alertEvents from '@/features/alerts/alertEvents'
 import { AddTransactionDialog } from './AddTransactionDialog'
 import { validateTransactionForm } from './validation'
 
@@ -94,6 +95,7 @@ describe('validateTransactionForm', () => {
 
 describe('AddTransactionDialog', () => {
   it('submits a successful expense with ML auto-categorization (category null)', async () => {
+    const mutationSpy = vi.spyOn(alertEvents, 'notifyFinancialMutation')
     const onSuccess = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -141,6 +143,7 @@ describe('AddTransactionDialog', () => {
       }),
     )
     expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(mutationSpy).toHaveBeenCalledWith('transaction:created')
   })
 
   it('submits a successful income transaction with explicit category', async () => {
@@ -241,6 +244,7 @@ describe('AddTransactionDialog', () => {
   })
 
   it('displays API error message and allows retry', async () => {
+    const mutationSpy = vi.spyOn(alertEvents, 'notifyFinancialMutation')
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ detail: 'Transaction description cannot be empty.' }, 422),
     )
@@ -261,9 +265,11 @@ describe('AddTransactionDialog', () => {
     // Form remains usable to correct and retry
     const saveButton = screen.getByRole('button', { name: /save transaction/i })
     expect(saveButton).toBeEnabled()
+    expect(mutationSpy).not.toHaveBeenCalled()
   })
 
   it('allows user to cancel without saving', async () => {
+    const mutationSpy = vi.spyOn(alertEvents, 'notifyFinancialMutation')
     const onOpenChange = vi.fn()
     render(
       <AddTransactionDialog open={true} onOpenChange={onOpenChange} onSuccess={vi.fn()} />,
@@ -272,5 +278,6 @@ describe('AddTransactionDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(fetchMock).not.toHaveBeenCalled()
+    expect(mutationSpy).not.toHaveBeenCalled()
   })
 })

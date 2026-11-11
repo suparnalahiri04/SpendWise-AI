@@ -13,6 +13,7 @@ export function useTransactions(): TransactionsState & {
   reload: () => void
   addTransactionLocally: (transaction: Transaction) => void
   updateTransactionLocally: (transaction: Transaction) => void
+  deleteTransactionLocally: (id: number) => void
 } {
   const [state, setState] = useState<TransactionsState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -69,5 +70,17 @@ export function useTransactions(): TransactionsState & {
     })
   }, [])
 
-  return { ...state, reload, addTransactionLocally, updateTransactionLocally }
+  const deleteTransactionLocally = useCallback((id: number) => {
+    setState((prev) => {
+      if (prev.status === 'success') {
+        return {
+          status: 'success',
+          transactions: prev.transactions.filter((t) => t.id !== id),
+        }
+      }
+      return prev
+    })
+  }, [])
+
+  return { ...state, reload, addTransactionLocally, updateTransactionLocally, deleteTransactionLocally }
 }

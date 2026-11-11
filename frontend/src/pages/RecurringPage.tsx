@@ -152,11 +152,16 @@ export function RecurringPage() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-paper-deep/60 p-1">
+            <div
+              className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-paper-deep/60 p-1"
+              role="group"
+              aria-label="Filter recurring schedules by status"
+            >
               <button
                 type="button"
+                aria-pressed={filterTab === 'active'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'active'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -167,8 +172,9 @@ export function RecurringPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'upcoming'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'upcoming'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -179,8 +185,9 @@ export function RecurringPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'overdue'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'overdue'
                     ? 'bg-card text-destructive shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -191,8 +198,9 @@ export function RecurringPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'cancelled'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'cancelled'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -203,8 +211,9 @@ export function RecurringPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'all'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'all'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',

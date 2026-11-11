@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { ContourPattern } from '@/components/common/ContourPattern'
+import { PennyAssistant } from '@/features/assistant/PennyAssistant'
 import { Header } from './Header'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
@@ -24,11 +26,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-8"
+          className="relative flex-1 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-8"
         >
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          <ContourPattern
+            variant="background"
+            className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+          />
+          <div className="relative z-10 mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </div>
+
+      <PennyAssistant />
     </div>
   )
 }

@@ -6,7 +6,6 @@ import { getNavItem } from '@/config/navigation'
 import { transitions } from '@/lib/motion'
 import { NotificationsMenu } from './NotificationsMenu'
 import { PeriodSelector } from './PeriodSelector'
-import { ProfileMenu } from './ProfileMenu'
 
 interface HeaderProps {
   onOpenMobileNav: () => void
@@ -51,7 +50,6 @@ export function Header({ onOpenMobileNav }: HeaderProps) {
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <PeriodSelector />
           <NotificationsMenu />
-          <ProfileMenu />
         </div>
       </div>
     </header>

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth_dependencies import get_current_user
 from app.dependencies import get_db
 from app.models import RecurringPayment, User
+from app.timezone import get_current_ist_date
 from app.schemas import (
     RecurringPaymentCreate,
     RecurringPaymentResponse,
@@ -19,11 +20,6 @@ router = APIRouter(prefix="/recurring-payments", tags=["Recurring Payments"])
 
 VALID_FREQUENCIES = {"weekly", "monthly", "quarterly", "yearly"}
 VALID_STATUSES = {"active", "cancelled"}
-
-
-def get_current_utc_date() -> date:
-    """Return the current date in UTC."""
-    return datetime.now(timezone.utc).date()
 
 
 def calculate_monthly_equivalent(amount: Decimal, frequency: str) -> Decimal:
@@ -95,7 +91,7 @@ def create_recurring_payment(
             detail=f"Frequency must be one of: {', '.join(sorted(VALID_FREQUENCIES))}.",
         )
 
-    today = get_current_utc_date()
+    today = get_current_ist_date()
     start_date = payment_data.start_date or today
     next_due_date = payment_data.next_due_date or start_date
 
@@ -130,7 +126,7 @@ def list_recurring_payments(
     db: Session = Depends(get_db),
 ) -> list[RecurringPaymentResponse]:
     """List recurring payments belonging only to the authenticated user."""
-    today = ref_date or get_current_utc_date()
+    today = ref_date or get_current_ist_date()
 
     statement = select(RecurringPayment).where(RecurringPayment.user_id == current_user.id)
 
@@ -162,7 +158,7 @@ def get_upcoming_recurring_payments(
     db: Session = Depends(get_db),
 ) -> list[RecurringPaymentResponse]:
     """Get upcoming active recurring payments due within the next N days."""
-    today = ref_date or get_current_utc_date()
+    today = ref_date or get_current_ist_date()
     cutoff_date = today + timedelta(days=days)
 
     statement = (
@@ -189,7 +185,7 @@ def get_overdue_recurring_payments(
     db: Session = Depends(get_db),
 ) -> list[RecurringPaymentResponse]:
     """Get active recurring payments that have passed their due date."""
-    today = ref_date or get_current_utc_date()
+    today = ref_date or get_current_ist_date()
 
     statement = (
         select(RecurringPayment)
@@ -215,7 +211,7 @@ def get_recurring_payments_summary(
     db: Session = Depends(get_db),
 ) -> RecurringPaymentSummaryResponse:
     """Provide summary metrics: active commitments, upcoming bills, and overdue payments."""
-    today = ref_date or get_current_utc_date()
+    today = ref_date or get_current_ist_date()
     cutoff_date = today + timedelta(days=days)
 
     statement = (
@@ -262,7 +258,7 @@ def get_recurring_payment(
     db: Session = Depends(get_db),
 ) -> RecurringPaymentResponse:
     """Retrieve a single recurring payment belonging to the authenticated user."""
-    today = ref_date or get_current_utc_date()
+    today = ref_date or get_current_ist_date()
     payment = db.scalar(
         select(RecurringPayment).where(
             RecurringPayment.id == payment_id,
@@ -351,7 +347,7 @@ def update_recurring_payment(
 
     db.commit()
     db.refresh(payment)
-    today = get_current_utc_date()
+    today = get_current_ist_date()
     return to_response(payment, today)
 
 
@@ -386,7 +382,7 @@ def cancel_recurring_payment(
 
     db.commit()
     db.refresh(payment)
-    today = get_current_utc_date()
+    today = get_current_ist_date()
     return to_response(payment, today)
 
 

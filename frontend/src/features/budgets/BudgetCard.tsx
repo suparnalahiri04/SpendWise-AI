@@ -16,7 +16,7 @@ interface BudgetCardProps {
 export function BudgetCard({ budget, onEdit, onDelete }: BudgetCardProps) {
   const percentage = Number(budget.percentage_used) || 0
   const isExceeded = Boolean(budget.is_exceeded || percentage > 100)
-  const status = getBudgetStatus(percentage, isExceeded)
+  const status = getBudgetStatus(percentage, isExceeded, budget.status)
 
   const spentNum = typeof budget.spent_amount === 'number'
     ? budget.spent_amount

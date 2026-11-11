@@ -1,5 +1,5 @@
 import { Loader2, Trash2, TriangleAlert } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { deleteBudget } from '@/lib/api/budgets'
 import { ApiError } from '@/lib/api/client'
 import type { BudgetProgressItem } from '@/lib/api/types'
@@ -29,7 +30,23 @@ export function DeleteBudgetDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!open) {
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [open])
+
   if (!budget) return null
+
+  function handleOpenChange(newOpen: boolean) {
+    if (!newOpen && submitting) return
+    if (!newOpen) {
+      setError(null)
+      setSubmitting(false)
+    }
+    onOpenChange(newOpen)
+  }
 
   async function handleDelete() {
     if (!budget || submitting) return
@@ -38,8 +55,9 @@ export function DeleteBudgetDialog({
 
     try {
       await deleteBudget(budget.id)
+      notifyFinancialMutation('budget:deleted')
       setSubmitting(false)
-      onOpenChange(false)
+      handleOpenChange(false)
       onSuccess()
     } catch (err: unknown) {
       setSubmitting(false)
@@ -52,7 +70,7 @@ export function DeleteBudgetDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -91,7 +109,7 @@ export function DeleteBudgetDialog({
             type="button"
             variant="outline"
             disabled={submitting}
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>

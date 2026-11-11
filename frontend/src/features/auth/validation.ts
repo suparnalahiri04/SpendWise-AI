@@ -15,3 +15,15 @@ export function validateCredentials(mode: AuthMode, { email, password }: Credent
   return null
 }
 
+/** Only allow redirecting back to an internal app path. */
+export function safeRedirect(from: unknown): string {
+  return typeof from === 'string' &&
+    from.startsWith('/') &&
+    !from.startsWith('//') &&
+    from !== '/login' &&
+    from !== '/register'
+    ? from
+    : '/overview'
+}
+
+

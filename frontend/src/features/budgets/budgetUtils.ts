@@ -87,20 +87,106 @@ export function validateBudgetForm(values: BudgetFormValues): string | null {
   return null
 }
 
+export type BudgetStatusSemantic =
+  | 'on_track'
+  | 'approaching_limit'
+  | 'limit_reached'
+  | 'over_budget'
+
+/** Classifies budget utilization according to standardized domain rules:
+ * - Below 80%: 'on_track'
+ * - 80% to below 100%: 'approaching_limit'
+ * - Exactly 100%: 'limit_reached'
+ * - Above 100%: 'over_budget'
+ *
+ * Uses unrounded numerical comparisons: comparing spent directly against limit and limit * 0.8.
+ */
+export function classifyBudgetStatus(
+  spent: number,
+  limit: number,
+): BudgetStatusSemantic {
+  if (limit <= 0) return 'on_track'
+  if (spent > limit) return 'over_budget'
+  if (spent === limit) return 'limit_reached'
+  if (spent >= limit * 0.8) return 'approaching_limit'
+  return 'on_track'
+}
+
 export interface BudgetStatusInfo {
   tone: 'sage' | 'butter' | 'terracotta'
   label: string
   /** Clamped percentage between 0 and 100 for drawing the progress bar track width. */
   progressPercent: number
+  statusSemantic: BudgetStatusSemantic
 }
 
-/** Determines visual alert tone, badge text, and clamped bar width. */
-export function getBudgetStatus(percentageUsed: number, isExceeded: boolean): BudgetStatusInfo {
+/** Determines visual alert tone, badge text, and clamped bar width.
+ * Standardized domain rules:
+ * - Below 80%: normal/healthy status ("On track" or "0% used")
+ * - 80% to below 100%: "Approaching limit" (warning / butter tone)
+ * - Exactly 100%: "Limit reached" (terracotta tone, distinct from "Over budget")
+ * - Above 100%: "Over budget" (terracotta tone)
+ *
+ * Uses authoritative backend status when provided, falling back to unrounded
+ * comparisons when only percentageUsed and isExceeded are available.
+ */
+export function getBudgetStatus(
+  percentageUsed: number,
+  isExceeded: boolean,
+  authoritativeStatus?: BudgetStatusSemantic | string | null,
+): BudgetStatusInfo {
+  // 1. Authoritative backend status takes precedence when provided
+  if (authoritativeStatus) {
+    if (authoritativeStatus === 'over_budget') {
+      return {
+        tone: 'terracotta',
+        label: 'Over budget',
+        progressPercent: 100,
+        statusSemantic: 'over_budget',
+      }
+    }
+    if (authoritativeStatus === 'limit_reached') {
+      return {
+        tone: 'terracotta',
+        label: 'Limit reached',
+        progressPercent: 100,
+        statusSemantic: 'limit_reached',
+      }
+    }
+    if (authoritativeStatus === 'approaching_limit') {
+      return {
+        tone: 'butter',
+        label: 'Approaching limit',
+        progressPercent: Math.min(100, Math.max(0, percentageUsed)),
+        statusSemantic: 'approaching_limit',
+      }
+    }
+    if (authoritativeStatus === 'on_track') {
+      return {
+        tone: 'sage',
+        label: percentageUsed === 0 ? '0% used' : 'On track',
+        progressPercent: Math.min(100, Math.max(0, percentageUsed)),
+        statusSemantic: 'on_track',
+      }
+    }
+  }
+
+  // 2. Fallback using unrounded numerical comparisons
   if (isExceeded || percentageUsed > 100) {
     return {
       tone: 'terracotta',
       label: 'Over budget',
       progressPercent: 100,
+      statusSemantic: 'over_budget',
+    }
+  }
+
+  if (percentageUsed === 100) {
+    return {
+      tone: 'terracotta',
+      label: 'Limit reached',
+      progressPercent: 100,
+      statusSemantic: 'limit_reached',
     }
   }
 
@@ -109,6 +195,7 @@ export function getBudgetStatus(percentageUsed: number, isExceeded: boolean): Bu
       tone: 'butter',
       label: 'Approaching limit',
       progressPercent: Math.min(100, Math.max(0, percentageUsed)),
+      statusSemantic: 'approaching_limit',
     }
   }
 
@@ -116,6 +203,7 @@ export function getBudgetStatus(percentageUsed: number, isExceeded: boolean): Bu
     tone: 'sage',
     label: percentageUsed === 0 ? '0% used' : 'On track',
     progressPercent: Math.min(100, Math.max(0, percentageUsed)),
+    statusSemantic: 'on_track',
   }
 }
 

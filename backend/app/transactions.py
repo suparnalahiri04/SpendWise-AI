@@ -1,4 +1,6 @@
 
+from datetime import date, datetime, time, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,6 +16,15 @@ from app.schemas import (
 from ml.predict import predict_category
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+
+
+def _coerce_to_utc_datetime(d: date | datetime) -> datetime:
+    """Coerce date or datetime to a timezone-aware UTC datetime."""
+    if isinstance(d, datetime):
+        if d.tzinfo is None:
+            return d.replace(tzinfo=timezone.utc)
+        return d.astimezone(timezone.utc)
+    return datetime.combine(d, time.min, tzinfo=timezone.utc)
 
 
 @router.post(
@@ -68,7 +79,7 @@ def create_transaction(
 
     transaction = Transaction(
         user_id=current_user.id,
-        transaction_date=transaction_data.transaction_date,
+        transaction_date=_coerce_to_utc_datetime(transaction_data.transaction_date),
         description=description,
         amount=transaction_data.amount,
         transaction_type=transaction_data.transaction_type,
@@ -128,11 +139,25 @@ def update_transaction(
             detail="Transaction not found.",
         )
 
-    transaction.transaction_date = transaction_data.transaction_date
-    transaction.description = transaction_data.description.strip()
+    description = transaction_data.description.strip()
+    if not description:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Transaction description cannot be empty.",
+        )
+
+    category = transaction_data.category.strip()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Category cannot be empty.",
+        )
+
+    transaction.transaction_date = _coerce_to_utc_datetime(transaction_data.transaction_date)
+    transaction.description = description
     transaction.amount = transaction_data.amount
     transaction.transaction_type = transaction_data.transaction_type
-    transaction.category = transaction_data.category.strip()
+    transaction.category = category
     transaction.is_reviewed = True
 
     db.commit()

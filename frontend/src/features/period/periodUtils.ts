@@ -68,6 +68,13 @@ export function getPeriodDateRange(
         endDate: todayStr,
       }
     }
+
+    case 'all': {
+      return {
+        startDate: '1970-01-01',
+        endDate: '9999-12-31',
+      }
+    }
   }
 }
 
@@ -80,6 +87,7 @@ export function isDateInPeriod(
   refDate: Date = new Date(),
 ): boolean {
   if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false
+  if (period === 'all') return true
   const { startDate, endDate } = getPeriodDateRange(period, refDate)
   return dateStr >= startDate && dateStr <= endDate
 }
@@ -93,6 +101,9 @@ export function filterTransactionsByPeriod<T extends { transaction_date: string 
   period: PeriodId,
   refDate: Date = new Date(),
 ): T[] {
+  if (period === 'all') {
+    return [...transactions]
+  }
   const { startDate, endDate } = getPeriodDateRange(period, refDate)
   return transactions.filter((tx) => {
     const d = tx.transaction_date

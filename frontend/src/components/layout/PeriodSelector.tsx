@@ -1,5 +1,4 @@
 import { CalendarDays, ChevronDown } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +15,15 @@ export function PeriodSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" aria-label={`Reporting period: ${periodLabel}`} className="px-3">
-          <CalendarDays className="text-forest-soft" aria-hidden="true" />
+        <button
+          type="button"
+          aria-label={`Reporting period: ${periodLabel}`}
+          className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 border border-input bg-card text-foreground hover:bg-paper-deep hover:border-sage-deep h-10 px-3 cursor-pointer"
+        >
+          <CalendarDays className="size-4 text-forest-soft shrink-0" aria-hidden="true" />
           <span className="hidden sm:inline">{periodLabel}</span>
-          <ChevronDown className="size-3.5! text-muted-foreground" aria-hidden="true" />
-        </Button>
+          <ChevronDown className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuLabel>Reporting period</DropdownMenuLabel>

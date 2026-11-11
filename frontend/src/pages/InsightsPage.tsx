@@ -18,8 +18,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatMonthLabel, getCurrentMonthString } from '@/features/budgets/budgetUtils'
 import { MonthSelector } from '@/features/budgets/MonthSelector'
+import { FinancialForecastSection } from '@/features/forecast/FinancialForecastSection'
+import { useForecast } from '@/features/forecast/useForecast'
 import { InsightCard } from '@/features/insights/InsightCard'
 import { useFinancialInsights } from '@/features/insights/useFinancialInsights'
+import { WhatIfSimulatorSection } from '@/features/simulator/WhatIfSimulatorSection'
 import type { InsightItem } from '@/lib/api/types'
 import { formatAmount } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -31,6 +34,7 @@ export function InsightsPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>('all')
 
   const { status, data, error, reload } = useFinancialInsights(selectedMonth)
+  const forecastState = useForecast()
   const monthLabel = formatMonthLabel(selectedMonth)
 
   const currentMonth = getCurrentMonthString()
@@ -66,7 +70,7 @@ export function InsightsPage() {
 
   // Summary Stat Values & Explanatory Labels
   const totalSpentLabel = isCurrentMonth ? 'Month-to-Date Outflows' : 'Total Outflows'
-  const projectedLabel = isCurrentMonth ? 'Projected Month-End' : 'Month-End Total'
+  const projectedLabel = isCurrentMonth ? 'Projected Month-End (Run Rate)' : 'Month-End Total'
 
   let totalSpentValue: string | null = null
   let projectedValue: string | null = null
@@ -74,7 +78,7 @@ export function InsightsPage() {
   let fixedCommitmentValue: string | null = null
 
   let totalSpentHint = isCurrentMonth ? 'Tracking month-to-date spending' : `Outflows in ${monthLabel}`
-  let projectedHint = isCurrentMonth ? 'Estimated month-end based on daily run rate' : 'Final closed total'
+  let projectedHint = isCurrentMonth ? 'Linear extrapolation based on daily run rate' : 'Final closed total'
   let savingsRateHint = 'Requires income recorded in this month'
   let fixedCommitmentHint = 'Requires income to calculate commitment ratio'
 
@@ -181,12 +185,22 @@ export function InsightsPage() {
         />
       </Reveal>
 
+      {/* Spending Forecast & Projections */}
+      <Reveal>
+        <FinancialForecastSection forecastState={forecastState} />
+      </Reveal>
+
+      {/* What-If Financial Simulator */}
+      <Reveal>
+        <WhatIfSimulatorSection forecastState={forecastState} />
+      </Reveal>
+
       {/* Main Content Area */}
       <Reveal>
         <Card className="min-w-0">
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
             <div className="min-w-0">
-              <CardTitle className="font-serif text-xl font-bold text-ink">
+              <CardTitle className="font-display text-xl font-bold text-ink">
                 Observations & Findings
               </CardTitle>
               <CardDescription>
@@ -195,11 +209,16 @@ export function InsightsPage() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-paper-deep/60 p-1">
+            <div
+              className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-paper-deep/60 p-1"
+              role="group"
+              aria-label="Filter observations by category"
+            >
               <button
                 type="button"
+                aria-pressed={filterTab === 'all'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'all'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -210,8 +229,9 @@ export function InsightsPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'patterns'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'patterns'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -222,8 +242,9 @@ export function InsightsPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'anomalies'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'anomalies'
                     ? 'bg-card text-destructive shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -234,8 +255,9 @@ export function InsightsPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'budgets'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'budgets'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',
@@ -246,8 +268,9 @@ export function InsightsPage() {
               </button>
               <button
                 type="button"
+                aria-pressed={filterTab === 'recurring'}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'min-h-[36px] sm:min-h-[32px] inline-flex items-center justify-center rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 select-none',
                   filterTab === 'recurring'
                     ? 'bg-card text-forest shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-ink',

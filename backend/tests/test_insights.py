@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.assistant_service import calculate_user_financial_facts
 from app.dependencies import get_db
 from app.insights import (
     MIN_ANOMALY_BASELINE_COUNT,
@@ -427,15 +428,33 @@ class FinancialInsightsTestCase(unittest.TestCase):
         self.assertEqual(item_shop.metric_label, "-60.0%")
         self.assertIn("₹3,000.00", item_shop.description)
 
-        # Spending stopped completely (-100%)
+        # Spending stopped completely in open/in-progress month:
+        # Suppress misleading -100% claims and clarify that zero expenses are recorded so far
         self.assertIn("cat-decrease-entertainment-2026-10", insight_map)
         item_ent = insight_map["cat-decrease-entertainment-2026-10"]
         self.assertEqual(item_ent.type, "pattern")
-        self.assertEqual(item_ent.severity, "positive")
+        self.assertEqual(item_ent.severity, "info")
         self.assertEqual(item_ent.category, "Entertainment")
-        self.assertEqual(item_ent.amount, Decimal("1000.00"))
-        self.assertEqual(item_ent.metric_label, "-100.0%")
-        self.assertIn("₹1,000.00", item_ent.description)
+        self.assertEqual(item_ent.amount, Decimal("0.00"))
+        self.assertIsNone(item_ent.metric_label)
+        self.assertEqual(item_ent.title, "No spending recorded in Entertainment")
+        self.assertIn("No expenses have been recorded for Entertainment so far in 2026-10", item_ent.description)
+        self.assertIn("Spending or scheduled commitments may still occur before month-end", item_ent.description)
+
+        # In a fully closed past month (e.g. checked in November), genuine 100% savings is confirmed
+        res_closed = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 11, 1),
+            current_user=self.user1,
+            db=self.db,
+        )
+        insight_map_closed = {i.id: i for i in res_closed.insights}
+        self.assertIn("cat-decrease-entertainment-2026-10", insight_map_closed)
+        item_ent_closed = insight_map_closed["cat-decrease-entertainment-2026-10"]
+        self.assertEqual(item_ent_closed.severity, "positive")
+        self.assertEqual(item_ent_closed.metric_label, "-100.0%")
+        self.assertEqual(item_ent_closed.title, "No spending in Entertainment")
+        self.assertIn("No spending was recorded in Entertainment during 2026-10", item_ent_closed.description)
 
     def test_unchanged_categories(self):
         # Sep: Rent = 15,000.00, Utilities = 2,000.00
@@ -574,6 +593,43 @@ class FinancialInsightsTestCase(unittest.TestCase):
         # No misleading category comparison cards should be created
         category_insights = [i for i in res.insights if i.category is not None]
         self.assertEqual(category_insights, [])
+
+    def test_zero_current_spent_in_progress_month_suppresses_misleading_cards(self):
+        # User has prior month (September) spend in 2 categories
+        t_prev1 = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 9, 10, 10, 0, tzinfo=timezone.utc),
+            description="Sep Utilities",
+            amount=Decimal("1200.00"),
+            transaction_type="expense",
+            category="Bills/Utilities",
+        )
+        t_prev2 = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc),
+            description="Sep Dining",
+            amount=Decimal("800.00"),
+            transaction_type="expense",
+            category="Food/Dining",
+        )
+        self.db.add_all([t_prev1, t_prev2])
+        self.db.commit()
+
+        # Current month (October) is in progress on Oct 2 with zero expenses recorded yet
+        res = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 10, 2),
+            current_user=self.user1,
+            db=self.db,
+        )
+        self.assertEqual(res.summary.total_spent_current_month, Decimal("0.00"))
+        self.assertEqual(res.summary.total_spent_previous_month, Decimal("2000.00"))
+        # In-progress month with zero current spending must not claim -100% reduction
+        self.assertIsNone(res.summary.month_over_month_change_pct)
+
+        # Must not generate misleading -100% "No spending" cards for all previous categories
+        pattern_cards = [i for i in res.insights if i.type == "pattern"]
+        self.assertEqual(pattern_cards, [])
 
     def test_user_isolation_category_insights(self):
         # User 1 has Groceries increase (+1,000.00)
@@ -1196,6 +1252,54 @@ class FinancialInsightsTestCase(unittest.TestCase):
         self.assertIn("₹3,600.00", item.description)
         self.assertIn("₹3,000.00", item.description)
 
+    def test_budget_threshold_exact_100_vs_rounded_100(self):
+        b_exact = Budget(
+            user_id=self.user1.id,
+            category="Utilities",
+            month="2026-10",
+            limit_amount=Decimal("1000.00"),
+        )
+        t_exact = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc),
+            description="Utility bill",
+            amount=Decimal("1000.00"),
+            transaction_type="expense",
+            category="Utilities",
+        )
+        b_near = Budget(
+            user_id=self.user1.id,
+            category="Travel",
+            month="2026-10",
+            limit_amount=Decimal("10000.00"),
+        )
+        t_near = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 10, 6, 12, 0, tzinfo=timezone.utc),
+            description="Flight booking",
+            amount=Decimal("9999.60"),
+            transaction_type="expense",
+            category="Travel",
+        )
+        self.db.add_all([b_exact, t_exact, b_near, t_near])
+        self.db.commit()
+
+        result = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 10, 15),
+            current_user=self.user1,
+            db=self.db,
+        )
+        insight_map = {item.id: item for item in result.insights}
+
+        exact_item = insight_map["budget-exceeded-utilities-2026-10"]
+        self.assertEqual(exact_item.severity, "critical")
+        self.assertEqual(exact_item.title, "Budget limit reached: Utilities")
+
+        near_item = insight_map["budget-warning-travel-2026-10"]
+        self.assertEqual(near_item.severity, "warning")
+        self.assertEqual(near_item.title, "Approaching budget limit: Travel")
+
     def test_missing_budget_generates_no_alert(self):
         # Expense in Travel = ₹15,000 (no budget for Travel exists)
         t_travel = Transaction(
@@ -1449,6 +1553,141 @@ class FinancialInsightsTestCase(unittest.TestCase):
         self.assertIn(f"recurring-overdue-{r_u2.id}-2026-10", u2_ids)
         self.assertNotIn("budget-warning-dining-2026-10", u2_ids)
         self.assertNotIn(f"recurring-upcoming-{r_u1.id}-2026-10", u2_ids)
+
+    def test_month_completion_date_boundary_semantics(self):
+        """Regression tests for month-completion boundary semantics and Insights/Assistant parity:
+        - Penultimate day (Oct 30): month in progress -> MoM is None, dropped categories info card.
+        - Final calendar day (Oct 31): month in progress -> MoM is None, dropped categories info card.
+        - First day of following month (Nov 1): month closed -> MoM is -100.0%, dropped categories positive card.
+        - Verifies exact consistency between Insights and Assistant MoM calculations.
+        """
+        # September: 3,000 in Shopping, 2,000 in Groceries = 5,000 total expense
+        s1 = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 9, 10, 10, 0, tzinfo=timezone.utc),
+            description="Sep Shopping",
+            amount=Decimal("3000.00"),
+            transaction_type="expense",
+            category="Shopping",
+        )
+        s2 = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 9, 20, 15, 0, tzinfo=timezone.utc),
+            description="Sep Groceries",
+            amount=Decimal("2000.00"),
+            transaction_type="expense",
+            category="Groceries",
+        )
+        # October: salary income only, zero expenses recorded
+        oct_inc = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc),
+            description="Oct Salary",
+            amount=Decimal("60000.00"),
+            transaction_type="income",
+            category="Income",
+        )
+        self.db.add_all([s1, s2, oct_inc])
+        self.db.commit()
+
+        # 1. Scenario A: zero expenses in current month
+        # 1a. Penultimate day: Oct 30 (month in progress)
+        res_pen_ins = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 10, 30),
+            current_user=self.user1,
+            db=self.db,
+        )
+        res_pen_asst = calculate_user_financial_facts(
+            user=self.user1,
+            db=self.db,
+            month="2026-10",
+            ref_date=date(2026, 10, 30),
+        )
+        self.assertIsNone(res_pen_ins.summary.month_over_month_change_pct)
+        self.assertIsNone(res_pen_asst.summary.mom_spending_change_pct)
+        self.assertNotIn("mom-spending-2026-10", {i.id: i for i in res_pen_ins.insights})
+
+        # 1b. Final calendar day: Oct 31 (month still in progress on its final day)
+        res_end_ins = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 10, 31),
+            current_user=self.user1,
+            db=self.db,
+        )
+        res_end_asst = calculate_user_financial_facts(
+            user=self.user1,
+            db=self.db,
+            month="2026-10",
+            ref_date=date(2026, 10, 31),
+        )
+        # Crucial boundary: Oct 31 is still in progress; must return None in both
+        self.assertIsNone(res_end_ins.summary.month_over_month_change_pct)
+        self.assertIsNone(res_end_asst.summary.mom_spending_change_pct)
+        self.assertNotIn("mom-spending-2026-10", {i.id: i for i in res_end_ins.insights})
+
+        # 1c. First day of following month: Nov 1 (month closed)
+        res_closed_ins = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 11, 1),
+            current_user=self.user1,
+            db=self.db,
+        )
+        res_closed_asst = calculate_user_financial_facts(
+            user=self.user1,
+            db=self.db,
+            month="2026-10",
+            ref_date=date(2026, 11, 1),
+        )
+        # Closed month with verified zero spending returns -100.0% in both
+        self.assertEqual(res_closed_ins.summary.month_over_month_change_pct, -100.0)
+        self.assertEqual(res_closed_asst.summary.mom_spending_change_pct, -100.0)
+        closed_map = {i.id: i for i in res_closed_ins.insights}
+        self.assertIn("mom-spending-2026-10", closed_map)
+        self.assertEqual(closed_map["mom-spending-2026-10"].metric_label, "-100.0%")
+
+        # 2. Scenario B: category dropped-to-zero spending with other current spending present
+        oct_groc = Transaction(
+            user_id=self.user1.id,
+            transaction_date=datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc),
+            description="Oct Groceries",
+            amount=Decimal("2000.00"),
+            transaction_type="expense",
+            category="Groceries",
+        )
+        self.db.add(oct_groc)
+        self.db.commit()
+
+        # On Oct 30 and Oct 31 (in progress): Shopping dropped to zero must be info card with metric_label None
+        for in_progress_date in [date(2026, 10, 30), date(2026, 10, 31)]:
+            with self.subTest(ref_date=in_progress_date):
+                res_in_prog = get_financial_insights(
+                    month="2026-10",
+                    ref_date=in_progress_date,
+                    current_user=self.user1,
+                    db=self.db,
+                )
+                m = {i.id: i for i in res_in_prog.insights}
+                self.assertIn("cat-decrease-shopping-2026-10", m)
+                item = m["cat-decrease-shopping-2026-10"]
+                self.assertEqual(item.severity, "info")
+                self.assertIsNone(item.metric_label)
+                self.assertIn("Spending or scheduled commitments may still occur before month-end", item.description)
+
+        # On Nov 1 (closed): Shopping dropped to zero is confirmed -100.0% positive pattern card
+        res_closed_b = get_financial_insights(
+            month="2026-10",
+            ref_date=date(2026, 11, 1),
+            current_user=self.user1,
+            db=self.db,
+        )
+        m_closed = {i.id: i for i in res_closed_b.insights}
+        self.assertIn("cat-decrease-shopping-2026-10", m_closed)
+        item_closed = m_closed["cat-decrease-shopping-2026-10"]
+        self.assertEqual(item_closed.severity, "positive")
+        self.assertEqual(item_closed.metric_label, "-100.0%")
+        self.assertEqual(item_closed.title, "No spending in Shopping")
+        self.assertIn("No spending was recorded in Shopping during 2026-10", item_closed.description)
 
 
 if __name__ == "__main__":

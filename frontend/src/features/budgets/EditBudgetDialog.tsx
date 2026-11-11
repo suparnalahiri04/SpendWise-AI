@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { updateBudget } from '@/lib/api/budgets'
 import { ApiError } from '@/lib/api/client'
 import { BUDGET_EXPENSE_CATEGORIES, type BudgetProgressItem } from '@/lib/api/types'
@@ -58,6 +59,7 @@ function EditBudgetForm({ budget, onCancel, onSuccess }: EditBudgetFormProps) {
         limit_amount: Number(limitAmount),
       })
 
+      notifyFinancialMutation('budget:updated')
       setSubmitting(false)
       onSuccess()
     } catch (err: unknown) {

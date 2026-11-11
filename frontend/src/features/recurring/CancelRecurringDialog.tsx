@@ -1,5 +1,5 @@
 import { AlertTriangle, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ApiError } from '@/lib/api/client'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { cancelRecurringPayment } from '@/lib/api/recurring'
 import type { RecurringPayment } from '@/lib/api/types'
 
@@ -28,7 +29,23 @@ export function CancelRecurringDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!open) {
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [open])
+
   if (!payment) return null
+
+  function handleOpenChange(newOpen: boolean) {
+    if (!newOpen && submitting) return
+    if (!newOpen) {
+      setError(null)
+      setSubmitting(false)
+    }
+    onOpenChange(newOpen)
+  }
 
   async function handleCancel() {
     if (!payment || submitting) return
@@ -37,8 +54,9 @@ export function CancelRecurringDialog({
 
     try {
       await cancelRecurringPayment(payment.id)
+      notifyFinancialMutation('recurring:cancelled')
       setSubmitting(false)
-      onOpenChange(false)
+      handleOpenChange(false)
       onSuccess()
     } catch (err: unknown) {
       setSubmitting(false)
@@ -51,7 +69,7 @@ export function CancelRecurringDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -89,7 +107,7 @@ export function CancelRecurringDialog({
             type="button"
             variant="outline"
             disabled={submitting}
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Keep schedule
           </Button>

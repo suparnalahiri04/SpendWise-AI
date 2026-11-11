@@ -3,6 +3,8 @@ from decimal import Decimal
 import unittest
 
 from fastapi import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.datastructures import Headers
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -445,6 +447,42 @@ class RecurringPaymentsTestCase(unittest.TestCase):
         self.assertEqual(summary.overdue_total, Decimal("450.00"))
         self.assertEqual(len(summary.upcoming_items), 1)
         self.assertEqual(len(summary.overdue_items), 1)
+
+    def test_cors_preflight_allows_patch_and_existing_methods(self):
+        cors_mw_entry = next(
+            (m for m in app.user_middleware if m.cls is CORSMiddleware),
+            None,
+        )
+        self.assertIsNotNone(cors_mw_entry, "CORSMiddleware must be registered on app")
+        configured_methods = cors_mw_entry.kwargs.get("allow_methods", [])
+        for method in ("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"):
+            self.assertIn(method, configured_methods)
+
+        cors_instance = CORSMiddleware(app=app.router, **cors_mw_entry.kwargs)
+        for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+            response = cors_instance.preflight_response(
+                request_headers=Headers(
+                    {
+                        "origin": "http://localhost:5173",
+                        "access-control-request-method": method,
+                        "access-control-request-headers": "Authorization, Content-Type",
+                    }
+                )
+            )
+            self.assertEqual(
+                response.status_code,
+                200,
+                f"Expected 200 OK CORS preflight for {method}, got {response.status_code}",
+            )
+            self.assertEqual(
+                response.headers.get("access-control-allow-origin"),
+                "http://localhost:5173",
+            )
+            allow_methods = [
+                m.strip()
+                for m in response.headers.get("access-control-allow-methods", "").split(",")
+            ]
+            self.assertIn(method, allow_methods)
 
 
 if __name__ == "__main__":

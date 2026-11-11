@@ -1,7 +1,9 @@
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.auth_dependencies import get_current_user
+from app.models import User
 from ml.predict import predict_category
 
 router = APIRouter(prefix="/ml", tags=["Machine Learning"])
@@ -23,6 +25,7 @@ class CategoryPredictionResponse(BaseModel):
 )
 def predict_transaction_category(
     request: CategoryPredictionRequest,
+    current_user: User = Depends(get_current_user),
 ) -> CategoryPredictionResponse:
     """Suggest an expense category for a transaction description."""
     try:

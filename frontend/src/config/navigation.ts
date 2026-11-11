@@ -1,11 +1,15 @@
 import {
   ArrowLeftRight,
+  BotMessageSquare,
+  Calendar,
   CalendarClock,
+  FileSpreadsheet,
   FileText,
   LayoutDashboard,
   PiggyBank,
   Settings,
   Sparkles,
+  Target,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,10 +48,28 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     description: 'Monthly spending limits by category',
   },
   {
+    label: 'Goals',
+    path: '/goals',
+    icon: Target,
+    description: 'Track targets, milestones and savings progress',
+  },
+  {
     label: 'Recurring',
     path: '/recurring',
     icon: CalendarClock,
     description: 'Scheduled bills, subscriptions and routines',
+  },
+  {
+    label: 'Calendar',
+    path: '/calendar',
+    icon: Calendar,
+    description: 'Monthly timeline of bills, income and expenses',
+  },
+  {
+    label: 'Reports',
+    path: '/reports',
+    icon: FileSpreadsheet,
+    description: 'Downloadable financial summaries and transaction ledgers',
   },
   {
     label: 'Insights',
@@ -64,7 +86,14 @@ export const SETTINGS_NAV: NavItem = {
   description: 'Profile and app preferences',
 }
 
-const ALL_NAV: readonly NavItem[] = [...PRIMARY_NAV, SETTINGS_NAV]
+export const ASSISTANT_NAV: NavItem = {
+  label: 'Assistant',
+  path: '/assistant',
+  icon: BotMessageSquare,
+  description: 'Ask questions about your finances and budgets',
+}
+
+const ALL_NAV: readonly NavItem[] = [...PRIMARY_NAV, SETTINGS_NAV, ASSISTANT_NAV]
 
 /** Find navigation metadata for the current URL path. */
 export function getNavItem(pathname: string): NavItem | undefined {

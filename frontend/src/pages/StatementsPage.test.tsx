@@ -70,6 +70,8 @@ const mockPreview: StatementPreviewResponse = {
       amount: '450.00',
       transaction_type: 'expense',
       category: 'Food/Dining',
+      predicted_category: 'Food/Dining',
+      prediction_confidence: '0.8800',
       is_valid: true,
       errors: [],
     },
@@ -203,6 +205,7 @@ describe('StatementsPage', () => {
     // Preview table displays parsed rows and stats
     expect(await screen.findByText('Review Statement Preview')).toBeInTheDocument()
     expect(screen.getByText('Swiggy Dinner')).toBeInTheDocument()
+    expect(screen.getByText('AI: Food/Dining (88%)')).toBeInTheDocument()
     expect(screen.getByText('Client Consulting')).toBeInTheDocument()
     expect(screen.getByText(/missing transaction description/i)).toBeInTheDocument()
 
@@ -355,5 +358,357 @@ describe('StatementsPage', () => {
     // Returns to upload area
     expect(await screen.findByText('Import a statement')).toBeInTheDocument()
     expect(screen.getByText('Drag and drop your statement file')).toBeInTheDocument()
+  })
+
+  it('normalizes ML confidence labels cleanly in StatementPreviewTable across decimal, percentage, 59.9%, and invalid inputs', async () => {
+    const user = userEvent.setup()
+
+    const boundaryPreview: StatementPreviewResponse = {
+      filename: 'boundary.csv',
+      total_rows: 5,
+      valid_rows: 5,
+      invalid_rows: 0,
+      preview: [
+        {
+          row_number: 2,
+          transaction_date: '2026-03-10',
+          description: 'Borderline Entry',
+          amount: '100.00',
+          transaction_type: 'expense',
+          category: 'Other',
+          predicted_category: 'Food/Dining',
+          prediction_confidence: '0.599',
+          is_valid: true,
+          errors: [],
+        },
+        {
+          row_number: 3,
+          transaction_date: '2026-03-11',
+          description: 'Threshold Exact Entry',
+          amount: '120.00',
+          transaction_type: 'expense',
+          category: 'Travel',
+          predicted_category: 'Travel',
+          prediction_confidence: '0.60',
+          is_valid: true,
+          errors: [],
+        },
+        {
+          row_number: 4,
+          transaction_date: '2026-03-12',
+          description: 'Percent Scale Entry',
+          amount: '140.00',
+          transaction_type: 'expense',
+          category: 'Shopping',
+          predicted_category: 'Shopping',
+          prediction_confidence: 85,
+          is_valid: true,
+          errors: [],
+        },
+        {
+          row_number: 5,
+          transaction_date: '2026-03-13',
+          description: 'Invalid Confidence Entry',
+          amount: '160.00',
+          transaction_type: 'expense',
+          category: 'Other',
+          predicted_category: 'Utilities',
+          prediction_confidence: 'invalid-val',
+          is_valid: true,
+          errors: [],
+        },
+        {
+          row_number: 6,
+          transaction_date: '2026-03-14',
+          description: 'Missing Confidence Entry',
+          amount: '180.00',
+          transaction_type: 'expense',
+          category: 'Other',
+          predicted_category: 'Healthcare',
+          prediction_confidence: null,
+          is_valid: true,
+          errors: [],
+        },
+      ],
+    }
+
+    fetchMock.mockImplementation(async (url, init) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('/auth/me')) return jsonResponse({ id: 1, email: 'user@example.com' })
+      if (urlStr.endsWith('/statements/history')) return jsonResponse([])
+      if (urlStr.endsWith('/statements/preview') && init?.method === 'POST') {
+        return jsonResponse(boundaryPreview)
+      }
+      return jsonResponse({}, 404)
+    })
+
+    renderPage()
+
+    const fileInput = screen.getByLabelText(/upload csv or xlsx statement file/i)
+    await user.upload(fileInput, new File(['mock'], 'boundary.csv', { type: 'text/csv' }))
+    await user.click(screen.getByRole('button', { name: /inspect & preview/i }))
+
+    expect(await screen.findByText('AI: Food/Dining (59.9%)')).toBeInTheDocument()
+    expect(screen.getByText('AI: Travel (60%)')).toBeInTheDocument()
+    expect(screen.getByText('AI: Shopping (85%)')).toBeInTheDocument()
+    expect(screen.getByText('AI: Utilities')).toBeInTheDocument()
+    expect(screen.getByText('AI: Healthcare')).toBeInTheDocument()
+    expect(screen.queryByText(/NaN%|8500%|Infinity%/)).not.toBeInTheDocument()
+  })
+
+  it('displays duplicate badge, count, and net importable count when preview includes duplicates', async () => {
+    const user = userEvent.setup()
+
+    const dupPreview = {
+      filename: 'reimport.csv',
+      total_rows: 2,
+      valid_rows: 2,
+      invalid_rows: 0,
+      duplicate_rows: 1,
+      preview: [
+        {
+          row_number: 2,
+          transaction_date: '2026-04-01',
+          description: 'Morning Coffee',
+          amount: '150.00',
+          transaction_type: 'expense',
+          category: 'Food/Dining',
+          is_valid: true,
+          is_duplicate: true,
+          errors: [],
+        },
+        {
+          row_number: 3,
+          transaction_date: '2026-04-02',
+          description: 'Metro Recharge',
+          amount: '500.00',
+          transaction_type: 'expense',
+          category: 'Transport',
+          is_valid: true,
+          is_duplicate: false,
+          errors: [],
+        },
+      ],
+    }
+
+    fetchMock.mockImplementation(async (url, init) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('/auth/me')) return jsonResponse({ id: 1, email: 'user@example.com' })
+      if (urlStr.endsWith('/statements/history')) return jsonResponse([])
+      if (urlStr.endsWith('/statements/preview') && init?.method === 'POST') {
+        return jsonResponse(dupPreview)
+      }
+      return jsonResponse({}, 404)
+    })
+
+    renderPage()
+
+    const fileInput = screen.getByLabelText(/upload csv or xlsx statement file/i)
+    await user.upload(fileInput, new File(['mock'], 'reimport.csv', { type: 'text/csv' }))
+    await user.click(screen.getByRole('button', { name: /inspect & preview/i }))
+
+    expect(await screen.findByText('Duplicate')).toBeInTheDocument()
+    expect(screen.getByText('Duplicates:').parentElement).toHaveTextContent('1')
+    expect(screen.getByText('Importable:').parentElement).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: /import 1 transaction$/i })).toBeInTheDocument()
+  })
+
+  it('displays Paytm SUCCESS eligibility, PENDING/FAILED/missing/unknown exclusions, and accurate importable count', async () => {
+    const user = userEvent.setup()
+
+    const paytmPreview: StatementPreviewResponse = {
+      filename: 'paytm_passbook.xlsx',
+      total_rows: 6,
+      valid_rows: 2,
+      importable_rows: 1,
+      invalid_rows: 0,
+      duplicate_rows: 1,
+      status_excluded_rows: 4,
+      pending_rows: 1,
+      failed_rows: 1,
+      missing_status_rows: 1,
+      unknown_status_rows: 1,
+      preview: [
+        {
+          row_number: 2,
+          transaction_date: '2026-04-01',
+          description: 'Payment to Swiggy',
+          amount: '450.00',
+          transaction_type: 'expense',
+          category: 'Food/Dining',
+          source_status: 'SUCCESS',
+          status_category: 'success',
+          is_status_excluded: false,
+          exclusion_reason: null,
+          is_valid: true,
+          is_duplicate: false,
+          errors: [],
+        },
+        {
+          row_number: 3,
+          transaction_date: '2026-04-01',
+          description: 'Payment to Swiggy',
+          amount: '450.00',
+          transaction_type: 'expense',
+          category: 'Food/Dining',
+          source_status: 'SUCCESS',
+          status_category: 'success',
+          is_status_excluded: false,
+          exclusion_reason: null,
+          is_valid: true,
+          is_duplicate: true,
+          errors: [],
+        },
+        {
+          row_number: 4,
+          transaction_date: '2026-04-02',
+          description: 'Pending Uber',
+          amount: '240.00',
+          transaction_type: 'expense',
+          category: 'Transport',
+          source_status: 'PENDING',
+          status_category: 'pending',
+          is_status_excluded: true,
+          exclusion_reason: 'Pending transaction — excluded (only SUCCESS transactions are imported).',
+          is_valid: false,
+          is_duplicate: false,
+          errors: [],
+        },
+        {
+          row_number: 5,
+          transaction_date: '2026-04-03',
+          description: 'Failed Bill',
+          amount: '999.00',
+          transaction_type: 'expense',
+          category: 'Other',
+          source_status: 'FAILED',
+          status_category: 'failed',
+          is_status_excluded: true,
+          exclusion_reason: 'Failed transaction — excluded (only SUCCESS transactions are imported).',
+          is_valid: false,
+          is_duplicate: false,
+          errors: [],
+        },
+        {
+          row_number: 6,
+          transaction_date: '2026-04-04',
+          description: 'Blank Status Row',
+          amount: '100.00',
+          transaction_type: 'expense',
+          category: 'Other',
+          source_status: null,
+          status_category: 'missing',
+          is_status_excluded: true,
+          exclusion_reason: 'Missing status — excluded (only SUCCESS transactions are imported).',
+          is_valid: false,
+          is_duplicate: false,
+          errors: [],
+        },
+        {
+          row_number: 7,
+          transaction_date: '2026-04-05',
+          description: 'Unknown Status Row',
+          amount: '150.00',
+          transaction_type: 'expense',
+          category: 'Shopping',
+          source_status: 'REVERSED',
+          status_category: 'unknown',
+          is_status_excluded: true,
+          exclusion_reason: "Unrecognized status 'REVERSED' — excluded (only SUCCESS transactions are imported).",
+          is_valid: false,
+          is_duplicate: false,
+          errors: [],
+        },
+      ],
+    }
+
+    fetchMock.mockImplementation(async (url, init) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('/auth/me')) return jsonResponse({ id: 1, email: 'user@example.com' })
+      if (urlStr.endsWith('/statements/history')) return jsonResponse([])
+      if (urlStr.endsWith('/statements/preview') && init?.method === 'POST') {
+        return jsonResponse(paytmPreview)
+      }
+      return jsonResponse({}, 404)
+    })
+
+    renderPage()
+
+    const fileInput = screen.getByLabelText(/upload csv or xlsx statement file/i)
+    await user.upload(fileInput, new File(['mock'], 'paytm_passbook.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    await user.click(screen.getByRole('button', { name: /inspect & preview/i }))
+
+    expect(await screen.findByText('SUCCESS · Eligible')).toBeInTheDocument()
+    expect(screen.getByText('Pending — Excluded')).toBeInTheDocument()
+    expect(screen.getByText('Failed — Excluded')).toBeInTheDocument()
+    expect(screen.getByText('Missing Status — Excluded')).toBeInTheDocument()
+    expect(screen.getByText('Unknown (REVERSED) — Excluded')).toBeInTheDocument()
+    expect(screen.getByText('Duplicate')).toBeInTheDocument()
+    expect(screen.getByText('Pending transaction — excluded (only SUCCESS transactions are imported).')).toBeInTheDocument()
+    expect(screen.getByText('Failed transaction — excluded (only SUCCESS transactions are imported).')).toBeInTheDocument()
+    expect(screen.getByText('Missing status — excluded (only SUCCESS transactions are imported).')).toBeInTheDocument()
+    expect(screen.getByText("Unrecognized status 'REVERSED' — excluded (only SUCCESS transactions are imported).")).toBeInTheDocument()
+
+    expect(screen.getByText('Total:').parentElement).toHaveTextContent('6')
+    expect(screen.getByText('Valid:').parentElement).toHaveTextContent('2')
+    expect(screen.getByText('Importable:').parentElement).toHaveTextContent('1')
+    expect(screen.getByText('Duplicates:').parentElement).toHaveTextContent('1')
+    expect(screen.getByText('Excluded:').parentElement).toHaveTextContent('4')
+    expect(screen.getByRole('button', { name: /import 1 transaction$/i })).toBeEnabled()
+  })
+
+  it('disables import and explains zero eligible rows when all rows are excluded or duplicates', async () => {
+    const user = userEvent.setup()
+
+    const zeroEligiblePreview: StatementPreviewResponse = {
+      filename: 'only_pending.xlsx',
+      total_rows: 1,
+      valid_rows: 0,
+      importable_rows: 0,
+      invalid_rows: 0,
+      duplicate_rows: 0,
+      status_excluded_rows: 1,
+      pending_rows: 1,
+      failed_rows: 0,
+      missing_status_rows: 0,
+      unknown_status_rows: 0,
+      preview: [
+        {
+          row_number: 2,
+          transaction_date: '2026-04-02',
+          description: 'Pending Order',
+          amount: '320.00',
+          transaction_type: 'expense',
+          category: 'Shopping',
+          source_status: 'PENDING',
+          status_category: 'pending',
+          is_status_excluded: true,
+          exclusion_reason: 'Pending transaction — excluded (only SUCCESS transactions are imported).',
+          is_valid: false,
+          is_duplicate: false,
+          errors: [],
+        },
+      ],
+    }
+
+    fetchMock.mockImplementation(async (url, init) => {
+      const urlStr = String(url)
+      if (urlStr.endsWith('/auth/me')) return jsonResponse({ id: 1, email: 'user@example.com' })
+      if (urlStr.endsWith('/statements/history')) return jsonResponse([])
+      if (urlStr.endsWith('/statements/preview') && init?.method === 'POST') {
+        return jsonResponse(zeroEligiblePreview)
+      }
+      return jsonResponse({}, 404)
+    })
+
+    renderPage()
+
+    const fileInput = screen.getByLabelText(/upload csv or xlsx statement file/i)
+    await user.upload(fileInput, new File(['mock'], 'only_pending.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    await user.click(screen.getByRole('button', { name: /inspect & preview/i }))
+
+    expect(await screen.findByText(/no success transactions are eligible to import/i)).toBeInTheDocument()
+    const importBtn = screen.getByRole('button', { name: /import 0 transactions/i })
+    expect(importBtn).toBeDisabled()
   })
 })

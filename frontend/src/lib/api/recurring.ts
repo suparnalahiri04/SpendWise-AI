@@ -1,3 +1,4 @@
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { ApiError, apiRequest } from './client'
 import type {
   RecurringPayment,
@@ -94,5 +95,6 @@ export async function deleteRecurringPayment(id: number, signal?: AbortSignal): 
     method: 'DELETE',
     signal,
   })
+  notifyFinancialMutation('recurring:deleted')
 }
 

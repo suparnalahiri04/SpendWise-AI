@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { ApiError } from '@/lib/api/client'
 import { createTransaction } from '@/lib/api/transactions'
 import {
@@ -83,6 +84,7 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess }: AddTrans
         category: category.trim() ? category : null,
       })
 
+      notifyFinancialMutation('transaction:created')
       setSubmitting(false)
       onSuccess(created)
       resetForm()

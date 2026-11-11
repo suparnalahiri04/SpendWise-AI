@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  classifyBudgetStatus,
   formatMonthLabel,
   getCurrentMonthString,
   getNextMonthString,
@@ -82,40 +83,114 @@ describe('budgetUtils', () => {
     ).toBe('Monthly budget limit must be greater than zero.')
   })
 
-  it('determines budget visual status correctly', () => {
-    // 0% spending
+  it('determines budget visual status correctly across standardized unrounded boundaries', () => {
+    // 1. Below 80% (0%, 45%, 79.9%, 79.99%) -> normal/healthy status
     const zero = getBudgetStatus(0, false)
     expect(zero.tone).toBe('sage')
     expect(zero.label).toBe('0% used')
     expect(zero.progressPercent).toBe(0)
+    expect(zero.statusSemantic).toBe('on_track')
 
-    // 45% spending (safe)
     const safe = getBudgetStatus(45, false)
     expect(safe.tone).toBe('sage')
     expect(safe.label).toBe('On track')
     expect(safe.progressPercent).toBe(45)
+    expect(safe.statusSemantic).toBe('on_track')
 
-    // 85% spending (approaching limit)
-    const warn = getBudgetStatus(85, false)
-    expect(warn.tone).toBe('butter')
-    expect(warn.label).toBe('Approaching limit')
-    expect(warn.progressPercent).toBe(85)
+    const justBelow80 = getBudgetStatus(79.99, false)
+    expect(justBelow80.tone).toBe('sage')
+    expect(justBelow80.label).toBe('On track')
+    expect(justBelow80.progressPercent).toBe(79.99)
+    expect(justBelow80.statusSemantic).toBe('on_track')
 
-    // 100% spending (approaching/at limit)
-    const atLimit = getBudgetStatus(100, false)
-    expect(atLimit.tone).toBe('butter')
+    // 2. Exactly 80.00% -> approaching limit (warning/butter)
+    const exactly80 = getBudgetStatus(80.0, false)
+    expect(exactly80.tone).toBe('butter')
+    expect(exactly80.label).toBe('Approaching limit')
+    expect(exactly80.progressPercent).toBe(80)
+    expect(exactly80.statusSemantic).toBe('approaching_limit')
+
+    // 3. Immediately below 100% (99.99%) -> approaching limit
+    const justBelow100 = getBudgetStatus(99.99, false)
+    expect(justBelow100.tone).toBe('butter')
+    expect(justBelow100.label).toBe('Approaching limit')
+    expect(justBelow100.progressPercent).toBe(99.99)
+    expect(justBelow100.statusSemantic).toBe('approaching_limit')
+
+    // 4. Exactly 100.00% -> limit reached (terracotta, NOT over budget)
+    const atLimit = getBudgetStatus(100.0, false)
+    expect(atLimit.tone).toBe('terracotta')
+    expect(atLimit.label).toBe('Limit reached')
     expect(atLimit.progressPercent).toBe(100)
+    expect(atLimit.statusSemantic).toBe('limit_reached')
 
-    // 125% spending (exceeded)
+    // 5. Above 100% (100.01%, 125%) -> over budget (terracotta)
+    const justAbove100 = getBudgetStatus(100.01, true)
+    expect(justAbove100.tone).toBe('terracotta')
+    expect(justAbove100.label).toBe('Over budget')
+    expect(justAbove100.progressPercent).toBe(100)
+    expect(justAbove100.statusSemantic).toBe('over_budget')
+
     const exceeded = getBudgetStatus(125, true)
     expect(exceeded.tone).toBe('terracotta')
     expect(exceeded.label).toBe('Over budget')
     expect(exceeded.progressPercent).toBe(100) // progress bar clamped to 100%
+    expect(exceeded.statusSemantic).toBe('over_budget')
 
-    // Exceeded even if percentage calculation was slightly off
+    // Exceeded flag only
     const flagOnly = getBudgetStatus(99, true)
     expect(flagOnly.tone).toBe('terracotta')
     expect(flagOnly.label).toBe('Over budget')
+    expect(flagOnly.statusSemantic).toBe('over_budget')
+  })
+
+  it('respects authoritative backend status to prevent rounded percentage_used artifacts', () => {
+    // When rounded percentage_used is 100.00 but backend classified it as approaching_limit (< 100% actual)
+    const nearLimit = getBudgetStatus(100.0, false, 'approaching_limit')
+    expect(nearLimit.tone).toBe('butter')
+    expect(nearLimit.label).toBe('Approaching limit')
+    expect(nearLimit.statusSemantic).toBe('approaching_limit')
+    expect(nearLimit.label).not.toBe('Limit reached')
+
+    // Backend confirms limit_reached
+    const limitReached = getBudgetStatus(100.0, false, 'limit_reached')
+    expect(limitReached.tone).toBe('terracotta')
+    expect(limitReached.label).toBe('Limit reached')
+    expect(limitReached.statusSemantic).toBe('limit_reached')
+
+    // Backend confirms over_budget
+    const over = getBudgetStatus(105.0, true, 'over_budget')
+    expect(over.tone).toBe('terracotta')
+    expect(over.label).toBe('Over budget')
+    expect(over.statusSemantic).toBe('over_budget')
+  })
+
+  it('classifies budget status semantics consistently using unrounded values', () => {
+    // 1. Below 80% (including 79.99%)
+    expect(classifyBudgetStatus(0, 1000)).toBe('on_track')
+    expect(classifyBudgetStatus(500, 1000)).toBe('on_track')
+    expect(classifyBudgetStatus(799.9, 1000)).toBe('on_track')
+    expect(classifyBudgetStatus(79.99, 100)).toBe('on_track')
+
+    // 2. Exactly 80.00%
+    expect(classifyBudgetStatus(800, 1000)).toBe('approaching_limit')
+    expect(classifyBudgetStatus(80.0, 100)).toBe('approaching_limit')
+
+    // 3. Immediately below 100% (including 99.99%)
+    expect(classifyBudgetStatus(999.9, 1000)).toBe('approaching_limit')
+    expect(classifyBudgetStatus(99.99, 100)).toBe('approaching_limit')
+
+    // 4. Exactly 100.00% -> limit reached
+    expect(classifyBudgetStatus(1000, 1000)).toBe('limit_reached')
+    expect(classifyBudgetStatus(100.0, 100)).toBe('limit_reached')
+
+    // 5. Above 100% (including 100.01%) -> over budget
+    expect(classifyBudgetStatus(1000.1, 1000)).toBe('over_budget')
+    expect(classifyBudgetStatus(100.01, 100)).toBe('over_budget')
+    expect(classifyBudgetStatus(1500, 1000)).toBe('over_budget')
+
+    // Edge case: zero/negative limit
+    expect(classifyBudgetStatus(50, 0)).toBe('on_track')
   })
 })
 

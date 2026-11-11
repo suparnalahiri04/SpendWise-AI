@@ -233,10 +233,19 @@ describe('RecurringPage', () => {
     })
     expect(screen.getByText('Electricity Bill')).toBeInTheDocument()
 
+    const filterGroup = screen.getByRole('group', { name: /filter recurring schedules by status/i })
+    expect(filterGroup).toBeInTheDocument()
+
+    const activeTab = screen.getByRole('button', { name: /^Active$/i })
+    expect(activeTab).toHaveAttribute('aria-pressed', 'true')
+
     // Switch to Overdue tab
     const overdueTab = screen.getByRole('button', { name: /^Overdue$/i })
+    expect(overdueTab).toHaveAttribute('aria-pressed', 'false')
     await user.click(overdueTab)
 
+    expect(overdueTab).toHaveAttribute('aria-pressed', 'true')
+    expect(activeTab).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText('Electricity Bill')).toBeInTheDocument()
     expect(screen.queryByText('Netflix')).not.toBeInTheDocument()
 

@@ -76,6 +76,15 @@ describe('getPeriodDateRange', () => {
       endDate: '2026-06-25',
     })
   })
+
+  it('calculates all for an unbounded all-time date range', () => {
+    const ref = new Date(2026, 2, 20)
+    const range = getPeriodDateRange('all', ref)
+    expect(range).toEqual({
+      startDate: '1970-01-01',
+      endDate: '9999-12-31',
+    })
+  })
 })
 
 describe('isDateInPeriod and filterTransactionsByPeriod', () => {
@@ -108,6 +117,24 @@ describe('isDateInPeriod and filterTransactionsByPeriod', () => {
   it('filters year-to-date correctly', () => {
     const filtered = filterTransactionsByPeriod(transactions, 'year-to-date', ref)
     expect(filtered.map((t) => t.id)).toEqual([2, 3, 4, 5])
+  })
+
+  it('filters all correctly, returning all transactions without date boundaries', () => {
+    const filtered = filterTransactionsByPeriod(transactions, 'all', ref)
+    expect(filtered.map((t) => t.id)).toEqual([1, 2, 3, 4, 5, 6])
+  })
+
+  it('handles all with empty transaction list', () => {
+    const filtered = filterTransactionsByPeriod([], 'all', ref)
+    expect(filtered).toEqual([])
+  })
+
+  it('validates dates in all period correctly', () => {
+    expect(isDateInPeriod('2026-03-15', 'all', ref)).toBe(true)
+    expect(isDateInPeriod('1999-01-01', 'all', ref)).toBe(true)
+    expect(isDateInPeriod('2099-12-31', 'all', ref)).toBe(true)
+    expect(isDateInPeriod('', 'all', ref)).toBe(false)
+    expect(isDateInPeriod('invalid-date', 'all', ref)).toBe(false)
   })
 
   it('handles invalid or empty transaction date safely', () => {

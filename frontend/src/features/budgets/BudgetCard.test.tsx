@@ -26,6 +26,30 @@ const mockWarningBudget: BudgetProgressItem = {
   is_exceeded: false,
 }
 
+const mockLimitReachedBudget: BudgetProgressItem = {
+  id: 4,
+  category: 'Utilities',
+  month: '2026-10',
+  limit_amount: '6000.00',
+  spent_amount: '6000.00',
+  remaining_amount: '0.00',
+  percentage_used: 100.0,
+  is_exceeded: false,
+  status: 'limit_reached',
+}
+
+const mockNearLimitBudget: BudgetProgressItem = {
+  id: 5,
+  category: 'Healthcare',
+  month: '2026-10',
+  limit_amount: '10000.00',
+  spent_amount: '9999.60',
+  remaining_amount: '0.40',
+  percentage_used: 100.0,
+  is_exceeded: false,
+  status: 'approaching_limit',
+}
+
 const mockExceededBudget: BudgetProgressItem = {
   id: 3,
   category: 'Electronics',
@@ -74,6 +98,35 @@ describe('BudgetCard', () => {
 
     const bar = container.querySelector('.from-\\[\\#c98e1f\\]')
     expect(bar).toBeInTheDocument()
+  })
+
+  it('renders budget at exactly 100% with limit-reached badge and zero remaining left', () => {
+    const { container } = render(
+      <BudgetCard budget={mockLimitReachedBudget} onEdit={vi.fn()} onDelete={vi.fn()} />,
+    )
+
+    expect(screen.getByText('Utilities')).toBeInTheDocument()
+    expect(screen.getByText('Limit reached')).toBeInTheDocument()
+    expect(screen.queryByText('Over budget')).not.toBeInTheDocument()
+    expect(screen.queryByText('Approaching limit')).not.toBeInTheDocument()
+    expect(screen.getByText('100.0%')).toBeInTheDocument()
+    expect(screen.getByText('₹0.00 left')).toBeInTheDocument()
+
+    const bar = container.querySelector('.from-terracotta')
+    expect(bar).toBeInTheDocument()
+  })
+
+  it('does not display Limit reached when rounded percentage is 100.00 but actual spending is below limit with approaching_limit status', () => {
+    render(
+      <BudgetCard budget={mockNearLimitBudget} onEdit={vi.fn()} onDelete={vi.fn()} />,
+    )
+
+    expect(screen.getByText('Healthcare')).toBeInTheDocument()
+    expect(screen.getByText('Approaching limit')).toBeInTheDocument()
+    expect(screen.queryByText('Limit reached')).not.toBeInTheDocument()
+    expect(screen.queryByText('Over budget')).not.toBeInTheDocument()
+    expect(screen.getByText('100.0%')).toBeInTheDocument()
+    expect(screen.getByText('₹0.40 left')).toBeInTheDocument()
   })
 
   it('renders exceeded budget with over-budget badge and terracotta bar', () => {

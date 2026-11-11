@@ -37,17 +37,17 @@ export function TopCategoriesBreakdown({
               {item.category}
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-ink">
+              <span className="font-semibold text-ink tabular">
                 ₹{formatAmount(item.amount.toFixed(2))}
               </span>
-              <span className="rounded bg-sage/60 px-1.5 py-0.5 text-[11px] font-medium text-forest">
+              <span className="rounded-full bg-sage/60 px-2 py-0.5 text-[11px] font-medium text-forest border border-sage-deep/40">
                 {item.percentage}%
               </span>
             </div>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper">
             <div
-              className="h-full rounded-full bg-forest transition-all duration-300"
+              className="h-full rounded-full bg-gradient-to-r from-forest to-forest-soft transition-all duration-300"
               style={{ width: `${Math.min(Math.max(item.percentage, 0), 100)}%` }}
               aria-hidden="true"
             />

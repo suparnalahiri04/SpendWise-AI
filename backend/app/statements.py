@@ -1,5 +1,3 @@
-
-
 from datetime import datetime, time, timezone
 from pathlib import Path
 
@@ -14,20 +12,43 @@ from app.schemas import StatementImportResponse, StatementPreviewResponse
 from app.statement_import import (
     build_statement_preview,
     preview_statement,
+    read_bounded_upload_bytes,
     read_statement_file,
+    transaction_dedup_key,
 )
 
 
 router = APIRouter(prefix="/statements", tags=["Statements"])
 
 
+def _load_existing_dedup_keys(db: Session, user_id: int) -> set:
+    existing_transactions = db.scalars(
+        select(Transaction).where(Transaction.user_id == user_id)
+    ).all()
+    return {
+        transaction_dedup_key(
+            transaction.transaction_date,
+            transaction.description,
+            transaction.amount,
+            transaction.transaction_type,
+        )
+        for transaction in existing_transactions
+    }
+
+
 @router.post("/preview", response_model=StatementPreviewResponse)
 async def preview_uploaded_statement(
     upload: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> StatementPreviewResponse:
     """Preview and validate a statement without saving transactions."""
-    return await preview_statement(upload)
+    existing_keys = (
+        _load_existing_dedup_keys(db, current_user.id)
+        if isinstance(db, Session)
+        else None
+    )
+    return await preview_statement(upload, existing_keys=existing_keys)
 
 
 @router.post("/import")
@@ -37,45 +58,13 @@ async def import_statement(
     db: Session = Depends(get_db),
 ):
     """Validate a statement and import valid, non-duplicate transactions."""
-    filename = Path(upload.filename or "statement.csv").name[:255]
-    content = await upload.read()
+    filename, content = await read_bounded_upload_bytes(upload)
 
     # Validate and parse the file before writing anything to the database.
     dataframe = read_statement_file(filename, content)
     preview = build_statement_preview(filename, dataframe)
 
-    # Build duplicate keys for this user's existing transactions.
-    existing_transactions = db.scalars(
-        select(Transaction).where(
-            Transaction.user_id == current_user.id
-        )
-    ).all()
-
-    def transaction_key(
-        transaction_date,
-        description,
-        amount,
-        transaction_type,
-        category,
-    ):
-        return (
-            transaction_date,
-            description.strip().casefold(),
-            amount,
-            transaction_type,
-            category.strip().casefold(),
-        )
-
-    seen = {
-        transaction_key(
-            transaction.transaction_date.date(),
-            transaction.description,
-            transaction.amount,
-            transaction.transaction_type,
-            transaction.category,
-        )
-        for transaction in existing_transactions
-    }
+    seen = _load_existing_dedup_keys(db, current_user.id)
 
     imported_count = 0
     rejected_count = 0
@@ -92,19 +81,18 @@ async def import_statement(
 
     try:
         for row in preview.preview:
-            if not row.is_valid:
+            if row.is_status_excluded or not row.is_valid:
                 rejected_count += 1
                 continue
 
-            key = transaction_key(
+            key = transaction_dedup_key(
                 row.transaction_date,
                 row.description,
                 row.amount,
                 row.transaction_type,
-                row.category,
             )
 
-            # Skip duplicates already in the database or this file.
+            # Skip duplicates already in the database or earlier in this file.
             if key in seen:
                 rejected_count += 1
                 continue
@@ -116,10 +104,12 @@ async def import_statement(
                     time.min,
                     tzinfo=timezone.utc,
                 ),
-                description=row.description,
+                description=row.description.replace("\x00", ""),
                 amount=row.amount,
                 transaction_type=row.transaction_type,
-                category=row.category,
+                category=row.category.replace("\x00", ""),
+                predicted_category=row.predicted_category,
+                prediction_confidence=row.prediction_confidence,
                 is_reviewed=False,
             )
             db.add(transaction)

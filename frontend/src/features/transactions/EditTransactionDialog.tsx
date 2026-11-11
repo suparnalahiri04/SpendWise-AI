@@ -9,8 +9,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { notifyFinancialMutation } from '@/features/alerts/alertEvents'
 import { ApiError } from '@/lib/api/client'
 import { updateTransaction } from '@/lib/api/transactions'
+import { formatConfidenceLabel } from '@/lib/format'
 import {
   TRANSACTION_CATEGORIES,
   type Transaction,
@@ -77,6 +79,7 @@ function EditTransactionForm({ transaction, onCancel, onSuccess }: EditTransacti
         category: category.trim(),
       })
 
+      notifyFinancialMutation('transaction:updated')
       setSubmitting(false)
       onSuccess(updated)
     } catch (caught) {
@@ -102,18 +105,20 @@ function EditTransactionForm({ transaction, onCancel, onSuccess }: EditTransacti
       )}
 
       {/* AI Context Banner if predicted/unreviewed */}
-      {transaction.predicted_category && (
-        <div className="flex items-center gap-2 rounded-xl border border-butter/60 bg-butter/20 px-3.5 py-2.5 text-xs text-ink/80">
-          <Sparkles className="size-4 shrink-0 text-butter" aria-hidden="true" />
-          <span>
-            Originally classified by AI as{' '}
-            <strong className="font-semibold text-ink">{transaction.predicted_category}</strong>
-            {transaction.prediction_confidence &&
-              ` (${(Number(transaction.prediction_confidence) * 100).toFixed(0)}% confidence)`}
-            . Saving your edit will mark it as reviewed.
-          </span>
-        </div>
-      )}
+      {transaction.predicted_category && (() => {
+        const confidenceLabel = formatConfidenceLabel(transaction.prediction_confidence)
+        return (
+          <div className="flex items-center gap-2 rounded-xl border border-butter/60 bg-butter/20 px-3.5 py-2.5 text-xs text-ink/80">
+            <Sparkles className="size-4 shrink-0 text-butter" aria-hidden="true" />
+            <span>
+              Originally classified by AI as{' '}
+              <strong className="font-semibold text-ink">{transaction.predicted_category}</strong>
+              {confidenceLabel && ` (${confidenceLabel} confidence)`}
+              . Saving your edit will mark it as reviewed.
+            </span>
+          </div>
+        )
+      })()}
 
       {/* Type Toggle (Segmented control) */}
       <div className="flex flex-col gap-1.5">

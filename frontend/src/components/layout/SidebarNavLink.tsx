@@ -11,8 +11,7 @@ interface SidebarNavLinkProps {
 
 /**
  * A sidebar navigation entry. The active background is a shared-layout
- * element, so it glides between entries when the route changes. Wrap groups of
- * links in a <LayoutGroup id="..."> so multiple sidebars never share it.
+ * element, so it glides between entries when the route changes.
  */
 export function SidebarNavLink({ item, onNavigate }: SidebarNavLinkProps) {
   const Icon = item.icon
@@ -22,9 +21,11 @@ export function SidebarNavLink({ item, onNavigate }: SidebarNavLinkProps) {
       onClick={onNavigate}
       className={({ isActive }) =>
         cn(
-          'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-colors duration-150',
-          'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-          isActive ? 'text-paper' : 'text-ink/75 hover:bg-paper-deep hover:text-ink',
+          'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-colors duration-150',
+          'focus-visible:ring-2 focus-visible:ring-[#F2EBDD] focus-visible:ring-offset-2 focus-visible:ring-offset-[#123C30]',
+          isActive
+            ? 'text-[#123C30]'
+            : 'text-[#F8F5EE]/90 hover:bg-white/[0.08] hover:text-[#FFFFFF]',
         )
       }
     >
@@ -33,16 +34,23 @@ export function SidebarNavLink({ item, onNavigate }: SidebarNavLinkProps) {
           {isActive && (
             <motion.span
               layoutId="sidebar-active"
-              className="absolute inset-0 rounded-xl bg-forest shadow-card"
+              className="absolute inset-0 rounded-xl bg-[#F2EBDD] shadow-sm"
               transition={transitions.indicator}
               aria-hidden="true"
             />
           )}
           <Icon
-            className={cn('relative size-[1.125rem]', isActive ? 'text-butter' : 'text-forest-soft')}
+            className={cn(
+              'relative size-[1.125rem] shrink-0 transition-colors duration-150',
+              isActive
+                ? 'text-[#123C30]'
+                : 'text-[#8EAA90] group-hover:text-[#A8C6AB]',
+            )}
             aria-hidden="true"
           />
-          <span className="relative">{item.label}</span>
+          <span className={cn('relative truncate', isActive && 'font-semibold text-[#123C30]')}>
+            {item.label}
+          </span>
         </>
       )}
     </NavLink>

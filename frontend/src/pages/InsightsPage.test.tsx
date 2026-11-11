@@ -237,6 +237,12 @@ describe('InsightsPage', () => {
     })
 
     // Default: All 5 insights present
+    const filterGroup = screen.getByRole('group', { name: /filter observations by category/i })
+    expect(filterGroup).toBeInTheDocument()
+
+    const allTab = screen.getByRole('button', { name: /^all/i })
+    expect(allTab).toHaveAttribute('aria-pressed', 'true')
+
     expect(screen.getByText('Month-over-month spending')).toBeInTheDocument()
     expect(screen.getByText('Unusual expense in Electronics')).toBeInTheDocument()
     expect(screen.getByText('Approaching budget limit: Groceries')).toBeInTheDocument()
@@ -244,7 +250,10 @@ describe('InsightsPage', () => {
 
     // Filter by Anomalies
     const anomaliesTab = screen.getByRole('button', { name: /anomalies/i })
+    expect(anomaliesTab).toHaveAttribute('aria-pressed', 'false')
     await user.click(anomaliesTab)
+    expect(anomaliesTab).toHaveAttribute('aria-pressed', 'true')
+    expect(allTab).toHaveAttribute('aria-pressed', 'false')
 
     expect(screen.getByText('Unusual expense in Electronics')).toBeInTheDocument()
     expect(screen.queryByText('Spending decrease in Dining')).not.toBeInTheDocument()

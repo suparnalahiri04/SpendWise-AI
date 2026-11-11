@@ -154,3 +154,69 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload as T
 }
 
+export interface DownloadOptions {
+  auth?: boolean
+  signal?: AbortSignal
+  accept?: string
+}
+
+export interface DownloadResult {
+  blob: Blob
+  filename: string | null
+}
+
+export async function apiDownload(path: string, options: DownloadOptions = {}): Promise<DownloadResult> {
+  const { auth = true, signal, accept = '*/*' } = options
+  const headers: Record<string, string> = { Accept: accept }
+
+  if (auth) {
+    const token = tokenProvider()
+    if (token) headers.Authorization = `Bearer ${token}`
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      method: 'GET',
+      headers,
+      signal,
+    })
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    if (isAbortError(error, signal)) throw error
+    throw new ApiError(
+      'network',
+      "We couldn't reach the SpendWise server. Check that the backend is running and try again.",
+    )
+  }
+
+  if (!response.ok) {
+    let payload: unknown = null
+    try {
+      payload = await response.json()
+    } catch {
+      payload = null
+    }
+    const error = toApiError(response.status, payload)
+    if (error.kind === 'unauthorized' && auth) unauthorizedHandler?.()
+    throw error
+  }
+
+  const disposition = response.headers.get('Content-Disposition')
+  let filename: string | null = null
+  if (disposition) {
+    const match = /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(disposition)
+    if (match) {
+      try {
+        filename = decodeURIComponent(match[1].trim())
+      } catch {
+        filename = match[1].trim()
+      }
+    }
+  }
+
+  const blob = await response.blob()
+  return { blob, filename }
+}
+
+

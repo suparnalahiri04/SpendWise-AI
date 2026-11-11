@@ -3,24 +3,24 @@ import {
   ArrowRight,
   CloudOff,
   FileText,
-  Lightbulb,
   PiggyBank,
   Receipt,
   RefreshCw,
-  Target,
+  Sparkles,
   TrendingUp,
   Wallet,
 } from 'lucide-react'
 import { Link } from 'react-router'
 import { TrendChart } from '@/components/charts/TrendChart'
 import { PageIntro } from '@/components/common/PageIntro'
-import { PeriodBadge } from '@/components/common/PeriodBadge'
 import { StatCard } from '@/components/common/StatCard'
+import { PeriodSelector } from '@/components/layout/PeriodSelector'
 import { AnimatedPage, Reveal } from '@/components/motion/AnimatedPage'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { calculateOverviewSummary } from '@/features/overview/overviewCalculations'
+import { RecentTransactionsCard } from '@/features/overview/RecentTransactionsCard'
 import { TopCategoriesBreakdown } from '@/features/overview/TopCategoriesBreakdown'
 import { usePeriod } from '@/features/period/period'
 import { filterTransactionsByPeriod } from '@/features/period/periodUtils'
@@ -108,13 +108,23 @@ export function OverviewPage() {
     }
   }
 
+  // 5 most recent transactions for the adaptive lower section
+  const recentTransactions = periodTransactions
+    .slice()
+    .sort((a, b) => {
+      const dateDiff =
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      return dateDiff !== 0 ? dateDiff : b.id - a.id
+    })
+    .slice(0, 5)
+
   return (
     <AnimatedPage>
       <PageIntro
-        eyebrow="Your money journal"
+        eyebrow="Financial Journal"
         title="A calm view of where your money goes"
         description="A clear summary of your spending, income, and category breakdowns for the selected reporting period."
-        actions={<PeriodBadge />}
+        actions={<PeriodSelector />}
       />
 
       {txState.status === 'error' && (
@@ -141,37 +151,32 @@ export function OverviewPage() {
         </Reveal>
       )}
 
-      <Reveal className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Three Primary KPI Cards: Total Income, Total Expenses, Net Savings */}
+      <Reveal className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
-          label="Total spending"
-          icon={Receipt}
-          value={spendingValue}
-          hint={spendingHint}
-          variant="hero"
-        />
-        <StatCard
-          label="Income"
+          label="Total Income"
           icon={Wallet}
           value={incomeValue}
           hint={incomeHint}
           accent="sage"
         />
         <StatCard
-          label="Net savings"
+          label="Total Expenses"
+          icon={Receipt}
+          value={spendingValue}
+          hint={spendingHint}
+          accent="terracotta"
+        />
+        <StatCard
+          label="Net Savings"
           icon={TrendingUp}
           value={savingsValue}
           hint={savingsHint}
-          accent="butter"
-        />
-        <StatCard
-          label="Budget used"
-          icon={Target}
-          value={null}
-          hint="Available once budgets are set"
-          accent="terracotta"
+          variant="hero"
         />
       </Reveal>
 
+      {/* Spending Analytics */}
       <Reveal className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -210,67 +215,79 @@ export function OverviewPage() {
         </Card>
       </Reveal>
 
+      {/* Adaptive Lower Section: Getting Started (new users) / Recent Transactions (established users) + AI Insights */}
       <Reveal className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div>
-              <CardTitle>Getting started</CardTitle>
-              <CardDescription>Three steps to fill your journal.</CardDescription>
-            </div>
-            <Badge tone="butter">Setup</Badge>
-          </CardHeader>
-          <CardContent>
-            <ol className="grid gap-3 sm:grid-cols-3">
-              {GETTING_STARTED.map(({ step, title, description, to, icon: Icon }) => (
-                <li key={step}>
-                  <Link
-                    to={to}
-                    className="group flex h-full flex-col gap-3 rounded-xl border border-border bg-paper/60 p-4 outline-none transition-all duration-150 hover:border-sage-deep hover:bg-sage/40 hover:shadow-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
-                  >
-                    <span className="flex items-center justify-between">
-                      <span className="flex size-8 items-center justify-center rounded-lg bg-card text-forest shadow-card">
-                        <Icon className="size-4" aria-hidden="true" />
+        {hasAnyTransactions ? (
+          <RecentTransactionsCard
+            transactions={recentTransactions}
+            periodLabel={periodLabel}
+          />
+        ) : (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <div>
+                <CardTitle>Getting started</CardTitle>
+                <CardDescription>Three steps to fill your journal.</CardDescription>
+              </div>
+              <Badge tone="butter">Setup</Badge>
+            </CardHeader>
+            <CardContent>
+              <ol className="grid gap-3 sm:grid-cols-3">
+                {GETTING_STARTED.map(({ step, title, description, to, icon: Icon }) => (
+                  <li key={step}>
+                    <Link
+                      to={to}
+                      className="group flex h-full flex-col gap-3 rounded-xl border border-border bg-paper/60 p-4 outline-none transition-all duration-150 hover:border-sage-deep hover:bg-sage/40 hover:shadow-subtle focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
+                    >
+                      <span className="flex items-center justify-between">
+                        <span className="flex size-8 items-center justify-center rounded-lg bg-card text-forest shadow-card">
+                          <Icon className="size-4" aria-hidden="true" />
+                        </span>
+                        <span className="text-xs font-semibold text-muted-foreground">Step {step}</span>
                       </span>
-                      <span className="text-xs font-semibold text-muted-foreground">Step {step}</span>
-                    </span>
-                    <span>
-                      <span className="block text-sm font-semibold text-ink">{title}</span>
-                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                        {description}
+                      <span>
+                        <span className="block text-sm font-semibold text-ink">{title}</span>
+                        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                          {description}
+                        </span>
                       </span>
-                    </span>
-                    <span className="mt-auto inline-flex items-center gap-1 text-xs font-medium text-forest">
-                      Open
-                      <ArrowRight
-                        className="size-3.5 transition-transform group-hover:translate-x-0.5"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
+                      <span className="mt-auto inline-flex items-center gap-1 text-xs font-medium text-forest">
+                        Open
+                        <ArrowRight
+                          className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className="bg-forest text-paper">
-          <CardHeader>
+        <Card className="flex flex-col justify-between overflow-hidden relative border-forest/30 bg-gradient-hero text-paper shadow-hero">
+          <div className="absolute -right-12 -top-12 size-40 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+          <CardHeader className="relative z-10">
             <div>
-              <CardTitle className="text-paper">AI insights</CardTitle>
-              <CardDescription className="text-paper/70">
-                Personalised observations about your habits.
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-lime-accent border border-white/15 backdrop-blur-xs mb-2">
+                <Sparkles className="size-3" aria-hidden="true" />
+                Intelligence
+              </span>
+              <CardTitle className="font-display text-2xl text-paper">AI Insights</CardTitle>
+              <CardDescription className="text-sage/80 mt-1">
+                Pattern recognition for your financial habits.
               </CardDescription>
             </div>
-            <Lightbulb className="size-5 text-butter" aria-hidden="true" />
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col justify-between gap-6">
-            <p className="font-display text-xl leading-snug text-paper">
-              Insights will appear here once there is enough transaction history to learn from.
+          <CardContent className="relative z-10 flex flex-1 flex-col justify-between gap-6">
+            <p className="text-sm leading-relaxed text-paper/85">
+              SpendWise AI continuously analyzes your spending trends, recurring bills, and category spikes to surface actionable financial intelligence.
             </p>
-            <Button asChild variant="accent" className="self-start">
+            <Button asChild variant="accent" className="self-start gap-1.5 shadow-md">
               <Link to="/insights">
-                About insights
-                <ArrowRight aria-hidden="true" />
+                Explore insights
+                <ArrowRight className="size-3.5" aria-hidden="true" />
               </Link>
             </Button>
           </CardContent>
