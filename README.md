@@ -1,5 +1,7 @@
 # SpendWise AI
 
+**Make every penny count.**
+
 SpendWise AI is a full-stack personal finance management application with machine-learning transaction categorization, statement import validation, budgeting, forecasting, reporting, and a deterministic financial assistant (**Penny**).
 
 ## Implemented Features

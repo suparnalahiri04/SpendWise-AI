@@ -117,7 +117,7 @@ export function LoginPage() {
             aria-hidden="true"
           />
           <h2 className="font-display text-3xl leading-[1.14] tracking-tight text-[#F8F5ED] xl:text-[2.5rem]">
-            Make every rupee count.
+            Make every penny count.
           </h2>
           <p className="mt-2.5 text-sm leading-relaxed text-[#F8F5ED]/80 xl:text-base">
             Understand your spending. Build better financial habits.
@@ -146,7 +146,7 @@ export function LoginPage() {
               SpendWise AI
             </span>
             <p className="mt-1 font-display text-xl leading-snug text-[#F8F5ED] sm:text-2xl">
-              Make every rupee count.
+              Make every penny count.
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[#F8F5ED]/80 sm:text-sm">
               Understand your spending. Build better financial habits.

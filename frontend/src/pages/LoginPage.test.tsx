@@ -64,7 +64,7 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { name: /welcome back\./i })).toBeInTheDocument()
     expect(screen.getByText(/sign in to continue to spendwise ai\./i)).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: /make every rupee count\./i }),
+      screen.getByRole('heading', { name: /make every penny count\./i }),
     ).toBeInTheDocument()
     expect(
       screen.getAllByText(/understand your spending\. build better financial habits\./i).length,
